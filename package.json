@@ -1,0 +1,73 @@
+{
+  "name": "@mojojs/minion",
+  "version": "0.1.1",
+  "description": "Node.js job queue",
+  "keywords": [
+    "postgres",
+    "pg",
+    "job-queue"
+  ],
+  "author": "Sebastian Riedel <kraih@mojolicious.org>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mojolicious/minion.js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mojolicious/minion.js/issues"
+  },
+  "homepage": "https://mojojs.org",
+  "scripts": {
+    "build": "npx tsc --build ./",
+    "build:clean": "npm run clean && npm run build",
+    "build:coverage": "npm run build && npm run coverage",
+    "build:lint": "npm run build && npm run lint",
+    "build:node": "npm run build && node",
+    "build:test": "npm run build && npm test",
+    "build:watch": "npm run build -- --watch",
+    "clean": "rm -rf tsconfig.tsbuildinfo lib",
+    "coverage": "c8 tap --no-coverage test/*.js",
+    "coverage:ci": "c8 --reporter lcovonly tap --no-coverage test/*.js",
+    "lint": "eslint \"test/*.js\" \"src/**/*.ts\" \"src/*.ts\"",
+    "lint:fix": "npm run lint -- --fix",
+    "prepublishOnly": "npm run build",
+    "publish:minor": "npm version minor && npm publish",
+    "publish:patch": "npm version patch && npm publish",
+    "test": "tap --no-coverage test/*.js"
+  },
+  "exports": "./lib/minion.js",
+  "types": "./lib/minion.d.ts",
+  "type": "module",
+  "files": [
+    "lib/",
+    "migrations/"
+  ],
+  "devDependencies": {
+    "@types/busboy": "^1.5.0",
+    "@types/node": "^18.0.0",
+    "@types/pg": "^8.6.1",
+    "@types/stack-utils": "^2.0.1",
+    "@types/tap": "^15.0.3",
+    "@types/tough-cookie": "^4.0.2",
+    "@types/ws": "^8.5.3",
+    "@typescript-eslint/eslint-plugin": "^5.1.0",
+    "c8": "^7.11.3",
+    "eslint": "^8.1.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.23.4",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.5.0",
+    "tap": "^16.3.0",
+    "typescript": "^4.7.0"
+  },
+  "engines": {
+    "node": ">= 16"
+  },
+  "dependencies": {
+    "@mojojs/core": "^1.1.2",
+    "@mojojs/path": "^1.5.1",
+    "@mojojs/pg": "^0.4.0",
+    "@mojojs/util": "^1.2.0"
+  }
+}

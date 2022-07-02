@@ -1,0 +1,31 @@
+name: coverage
+on: [push, pull_request]
+jobs:
+  coveralls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 18
+      - name: npm install
+        run: npm i
+      - name: npm run build
+        run: npm run build
+      - name: npm run coverage:ci
+        run: npm run coverage:ci
+        env:
+          TEST_ONLINE: postgresql://postgres:postgres@/postgres
+      - name: coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
