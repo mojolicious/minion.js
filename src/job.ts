@@ -20,11 +20,11 @@ export class Job {
     this.task = task;
   }
 
-  async fail(result: any): Promise<boolean> {
+  async fail(result?: any): Promise<boolean> {
     return await this.minion.backend.failJob(this.id, this.retries, result);
   }
 
-  async finish(result: any): Promise<boolean> {
+  async finish(result?: any): Promise<boolean> {
     return await this.minion.backend.finishJob(this.id, this.retries, result);
   }
 
@@ -35,6 +35,16 @@ export class Job {
 
   async note(merge: Record<string, any>): Promise<boolean> {
     return await this.minion.backend.note(this.id, merge);
+  }
+
+  async perform(): Promise<void> {
+    try {
+      const task = this.minion.tasks[this.task];
+      await task(this, ...this.args);
+      await this.finish();
+    } catch (error) {
+      await this.fail(error);
+    }
   }
 
   async remove(): Promise<boolean> {

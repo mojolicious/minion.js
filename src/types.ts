@@ -5,8 +5,8 @@ export interface MinionBackend {
   dequeue: (id: MinionWorkerId, wait?: number, options?: DequeueOptions) => Promise<DequeuedJob | null>;
   end: () => Promise<void>;
   enqueue: (task: string, args?: MinionArgs, options?: EnqueueOptions) => Promise<MinionJobId>;
-  failJob: (id: MinionJobId, retries: number, result: any) => Promise<boolean>;
-  finishJob: (id: MinionJobId, retries: number, result: any) => Promise<boolean>;
+  failJob: (id: MinionJobId, retries: number, result?: any) => Promise<boolean>;
+  finishJob: (id: MinionJobId, retries: number, result?: any) => Promise<boolean>;
   history: () => Promise<any>;
   listJobs: (offset: number, limit: number, options?: ListJobsOptions) => Promise<JobList>;
   listLocks: (offset: number, limit: number, options?: ListLocksOptions) => Promise<LockList>;

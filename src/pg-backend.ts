@@ -142,11 +142,11 @@ export class PgBackend {
     return results.first?.id ?? 0;
   }
 
-  async failJob(id: MinionJobId, retries: number, result: any): Promise<boolean> {
+  async failJob(id: MinionJobId, retries: number, result?: any): Promise<boolean> {
     return await this._update('failed', id, retries, result);
   }
 
-  async finishJob(id: MinionJobId, retries: number, result: any): Promise<boolean> {
+  async finishJob(id: MinionJobId, retries: number, result?: any): Promise<boolean> {
     return await this._update('finished', id, retries, result);
   }
 
@@ -399,7 +399,7 @@ export class PgBackend {
     return results.first;
   }
 
-  async _update(state: 'finished' | 'failed', id: MinionJobId, retries: number, result: any): Promise<boolean> {
+  async _update(state: 'finished' | 'failed', id: MinionJobId, retries: number, result?: any): Promise<boolean> {
     const jsonResult = JSON.stringify(result);
     const results = await this.pg.query<UpdateResult>`
       UPDATE minion_jobs SET finished = NOW(), result = ${jsonResult}, state = ${state}

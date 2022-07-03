@@ -63,7 +63,7 @@ export default class Minion {
 
   async job(id: MinionJobId): Promise<Job | null> {
     const info = (await this.backend.listJobs(0, 1, {ids: [id]})).jobs[0];
-    return info === null ? null : new Job(this, id, info.args, info.retries, info.task);
+    return info === undefined ? null : new Job(this, id, info.args, info.retries, info.task);
   }
 
   async lock(name: string, duration: number, options: LockOptions): Promise<boolean> {

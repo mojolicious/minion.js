@@ -50,7 +50,7 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Job results', async t => {
-    minion.addTask('test', () => {
+    minion.addTask('test', async () => {
       return;
     });
     const worker = minion.worker();
@@ -127,6 +127,7 @@ t.test('PostgreSQL backend', skip, async t => {
     const worker = await minion.worker().register();
     const worker2 = await minion.worker().register();
     t.not(worker.id, worker2.id);
+
     const id = await minion.enqueue('test');
     const job = await worker2.dequeue(0);
     t.equal(job.id, id);
@@ -137,6 +138,7 @@ t.test('PostgreSQL backend', skip, async t => {
     await minion.backend.pg.query`
       UPDATE minion_workers SET notified = NOW() - INTERVAL '1 second' * ${missingAfter} WHERE id = ${workerId}
     `;
+
     await minion.repair();
     t.ok(!(await worker2.info()));
     const info = await job.info();
@@ -167,6 +169,38 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal(info.state, 'active');
     t.equal(info.queue, 'minion_foreground');
     t.same(info.result, null);
+  });
+
+  await t.test('Repair old jobs', async t => {
+    t.equal(minion.removeAfter, 172800);
+    const worker = await minion.worker().register();
+    const id = await minion.enqueue('test');
+    const id2 = await minion.enqueue('test');
+    const id3 = await minion.enqueue('test');
+
+    await worker.dequeue(0).then(job => job.perform());
+    await worker.dequeue(0).then(job => job.perform());
+    await worker.dequeue(0).then(job => job.perform());
+
+    const pg = minion.backend.pg;
+    const finished = (
+      await pg.query`SELECT EXTRACT(EPOCH FROM finished) AS finished FROM minion_jobs WHERE id = ${id2}`
+    ).first.finished;
+    await pg.query`UPDATE minion_jobs SET finished = TO_TIMESTAMP(${
+      finished - (minion.removeAfter + 1)
+    }) WHERE id = ${id2}`;
+    const finished2 = (
+      await pg.query`SELECT EXTRACT(EPOCH FROM finished) AS finished FROM minion_jobs WHERE id = ${id3}`
+    ).first.finished;
+    await pg.query`UPDATE minion_jobs SET finished = TO_TIMESTAMP(${
+      finished2 - (minion.removeAfter + 1)
+    }) WHERE id = ${id3}`;
+
+    await worker.unregister();
+    await minion.repair();
+    t.ok(await minion.job(id));
+    t.ok(!(await minion.job(id2)));
+    t.ok(!(await minion.job(id3)));
   });
 
   await t.test('Exclusive lock', async t => {
