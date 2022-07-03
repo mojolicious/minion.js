@@ -173,6 +173,7 @@ t.test('PostgreSQL backend', skip, async t => {
 
   await t.test('Repair old jobs', async t => {
     t.equal(minion.removeAfter, 172800);
+
     const worker = await minion.worker().register();
     const id = await minion.enqueue('test');
     const id2 = await minion.enqueue('test');
@@ -201,6 +202,41 @@ t.test('PostgreSQL backend', skip, async t => {
     t.ok(await minion.job(id));
     t.ok(!(await minion.job(id2)));
     t.ok(!(await minion.job(id3)));
+  });
+
+  await t.test('Repair stuck jobs', async t => {
+    t.equal(minion.stuckAfter, 172800);
+
+    const worker = await minion.worker().register();
+    const id = await minion.enqueue('test');
+    const id2 = await minion.enqueue('test');
+    const id3 = await minion.enqueue('test');
+    const id4 = await minion.enqueue('test');
+
+    const pg = minion.backend.pg;
+    const stuck = minion.stuckAfter + 1;
+    await pg.query`UPDATE minion_jobs SET delayed = NOW() - ${stuck} * INTERVAL '1 second' WHERE id = ${id}`;
+    await pg.query`UPDATE minion_jobs SET delayed = NOW() - ${stuck} * INTERVAL '1 second' WHERE id = ${id2}`;
+    await pg.query`UPDATE minion_jobs SET delayed = NOW() - ${stuck} * INTERVAL '1 second' WHERE id = ${id3}`;
+    await pg.query`UPDATE minion_jobs SET delayed = NOW() - ${stuck} * INTERVAL '1 second' WHERE id = ${id4}`;
+
+    const job = await worker.dequeue(0, {id: id4});
+    await job.finish('Works!');
+    const job2 = await worker.dequeue(0, {id: id2});
+    await minion.repair();
+
+    t.equal((await job2.info()).state, 'active');
+    t.ok(await job2.finish());
+    const job3 = await minion.job(id);
+    t.equal((await job3.info()).state, 'failed');
+    t.equal((await job3.info()).result, 'Job appears stuck in queue');
+    const job4 = await minion.job(id3);
+    t.equal((await job4.info()).state, 'failed');
+    t.equal((await job4.info()).result, 'Job appears stuck in queue');
+    const job5 = await minion.job(id4);
+    t.equal((await job5.info()).state, 'finished');
+    t.equal((await job5.info()).result, 'Works!');
+    await worker.unregister();
   });
 
   await t.test('Exclusive lock', async t => {
