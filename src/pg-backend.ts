@@ -88,16 +88,20 @@ export class PgBackend {
   }
 
   async broadcast(command: string, args: any[] = [], ids: MinionWorkerId[] = []): Promise<boolean> {
-    const results = await this.pg.query`
-      UPDATE minion_workers SET inbox = inbox || ${[command, ...args]}::JSONB
-      WHERE (id = ANY (${ids}) OR ${ids} = '{}')
-    `;
+    const results = await this.pg.rawQuery(
+      `
+        UPDATE minion_workers SET inbox = inbox || $1::JSONB
+        WHERE (id = ANY ($2) OR $2 = '{}')
+      `,
+      [command, ...args],
+      ids
+    );
     return (results.count ?? 0) > 0;
   }
 
   async dequeue(id: MinionWorkerId, wait: number, options: DequeueOptions): Promise<DequeuedJob | null> {
     const job = await this._try(id, options);
-    if (job !== null) return job;
+    if (job !== undefined) return job;
 
     const db = await this.pg.db();
     try {
@@ -120,26 +124,28 @@ export class PgBackend {
   }
 
   async enqueue(task: string, args: MinionArgs = [], options: EnqueueOptions = {}): Promise<MinionJobId> {
-    const attempts = options.attempts ?? 1;
-    const delay = options.delay ?? 0;
-    const expire = options.expire;
-    const lax = options.lax ?? false;
-    const notes = options.notes ?? {};
-    const parents = options.parents ?? [];
-    const priority = options.priority ?? 0;
-    const queue = options.queue ?? 'default';
+    const results = await this.pg.rawQuery<EnqueueResult>(
+      `
+        INSERT INTO minion_jobs (args, attempts, delayed, expires, lax, notes, parents, priority, queue, task)
+        VALUES ($1, $2, (NOW() + (INTERVAL '1 second' * $3)),
+          CASE WHEN $4::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * $4::BIGINT) END,
+          $5, $6, $7, $8, $9, $10
+        )
+        RETURNING id
+      `,
+      JSON.stringify(args),
+      options.attempts ?? 1,
+      options.delay ?? 0,
+      options.expire,
+      options.lax ?? false,
+      options.notes ?? {},
+      options.parents ?? [],
+      options.priority ?? 0,
+      options.queue ?? 'default',
+      task
+    );
 
-    const jsonArgs = JSON.stringify(args);
-    const results = await this.pg.query<EnqueueResult>`
-      INSERT INTO minion_jobs (args, attempts, delayed, expires, lax, notes, parents, priority, queue, task)
-      VALUES (${jsonArgs}, ${attempts}, (NOW() + (INTERVAL '1 second' * ${delay})),
-        CASE WHEN ${expire}::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * ${expire}::BIGINT) END,
-        ${lax}, ${notes}, ${parents}, ${priority}, ${queue}, ${task}
-      )
-      RETURNING id
-    `;
-
-    return results.first?.id ?? 0;
+    return results.first.id;
   }
 
   async failJob(id: MinionJobId, retries: number, result?: any): Promise<boolean> {
@@ -171,30 +177,31 @@ export class PgBackend {
   }
 
   async listJobs(offset: number, limit: number, options: ListJobsOptions = {}): Promise<JobList> {
-    const before = options.before;
-    const ids = options.ids ?? [];
-    const notes = options.notes;
-    const queues = options.queues;
-    const states = options.states;
-    const tasks = options.tasks;
-
-    const results = await this.pg.query<ListJobsResult>`
-      SELECT id, args, attempts,
-          ARRAY(SELECT id FROM minion_jobs WHERE parents @> ARRAY[j.id]) AS children,
-          EXTRACT(epoch FROM created) AS created, EXTRACT(EPOCH FROM delayed) AS delayed,
-          EXTRACT(EPOCH FROM expires) AS expires, EXTRACT(EPOCH FROM finished) AS finished, lax, notes, parents, priority,
-          queue, result, EXTRACT(EPOCH FROM retried) AS retried, retries, EXTRACT(EPOCH FROM started) AS started, state,
-          task, EXTRACT(EPOCH FROM now()) AS time, COUNT(*) OVER() AS total, worker
-        FROM minion_jobs AS j
-        WHERE (id < ${before} OR ${before}::BIGINT IS NULL) AND (id = ANY (${ids}) OR ${ids}::BIGINT[] IS NULL)
-          AND (notes \? ANY (${notes}) OR ${notes}::JSONB IS NULL)
-          AND (queue = ANY (${queues}) OR ${queues}::TEXT[] IS null)
-          AND (state = ANY (${states}) OR ${states}::TEXT[] IS NULL)
-          AND (task = ANY (${tasks}) OR ${tasks}::TEXT[] IS NULL)
-          AND (state != 'inactive' OR expires IS NULL OR expires > NOW())
-        ORDER BY id DESC
-        LIMIT ${limit} OFFSET ${offset}
-    `;
+    const results = await this.pg.rawQuery<ListJobsResult>(
+      `
+        SELECT id, args, attempts,
+            ARRAY(SELECT id FROM minion_jobs WHERE parents @> ARRAY[j.id]) AS children,
+            EXTRACT(epoch FROM created) AS created, EXTRACT(EPOCH FROM delayed) AS delayed,
+            EXTRACT(EPOCH FROM expires) AS expires, EXTRACT(EPOCH FROM finished) AS finished, lax, notes, parents,
+            priority, queue, result, EXTRACT(EPOCH FROM retried) AS retried, retries,
+            EXTRACT(EPOCH FROM started) AS started, state, task, EXTRACT(EPOCH FROM now()) AS time,
+            COUNT(*) OVER() AS total, worker
+          FROM minion_jobs AS j
+          WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL) AND (notes ? ANY ($3) OR $3 IS NULL)
+            AND (queue = ANY ($4) OR $4 IS NULL) AND (state = ANY ($5) OR $5 IS NULL)
+            AND (task = ANY ($6) OR $6 IS NULL) AND (state != 'inactive' OR expires IS NULL OR expires > NOW())
+          ORDER BY id DESC
+          LIMIT $7 OFFSET $8
+      `,
+      options.before,
+      options.ids ?? [],
+      options.notes,
+      options.queues,
+      options.states,
+      options.tasks,
+      limit,
+      offset
+    );
 
     return {total: _removeTotal(results), jobs: results};
   }
@@ -202,11 +209,16 @@ export class PgBackend {
   async listLocks(offset: number, limit: number, options: ListLocksOptions = {}): Promise<LockList> {
     const names = options.names;
 
-    const results = await this.pg.query<ListLockResult>`
-      SELECT name, EXTRACT(EPOCH FROM expires) AS expires, COUNT(*) OVER() AS total FROM minion_locks
-      WHERE expires > NOW() AND (name = ANY (${names}) OR ${names}::TEXT[] IS NULL)
-      ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}
-    `;
+    const results = await this.pg.rawQuery<ListLockResult>(
+      `
+        SELECT name, EXTRACT(EPOCH FROM expires) AS expires, COUNT(*) OVER() AS total FROM minion_locks
+        WHERE expires > NOW() AND (name = ANY ($1) OR $1 IS NULL)
+        ORDER BY id DESC LIMIT $2 OFFSET $2
+      `,
+      names,
+      limit,
+      offset
+    );
 
     return {total: _removeTotal(results), locks: results};
   }
@@ -215,14 +227,20 @@ export class PgBackend {
     const before = options.before;
     const ids = options.ids ?? [];
 
-    const results = await this.pg.query<ListWorkersResult>`
-      SELECT id, notified, ARRAY(
-          SELECT id FROM minion_jobs WHERE state = 'active' AND worker = minion_workers.id
-        ) AS jobs, host, pid, status, started, COUNT(*) OVER() AS total
-      FROM minion_workers
-      WHERE (id < ${before} OR ${before}::BIGINT IS NULL) AND (id = ANY (${ids}) OR ${ids}::BIGINT[] IS NULL)
-      ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}
-    `;
+    const results = await this.pg.rawQuery<ListWorkersResult>(
+      `
+        SELECT id, notified, ARRAY(
+            SELECT id FROM minion_jobs WHERE state = 'active' AND worker = minion_workers.id
+          ) AS jobs, host, pid, status, started, COUNT(*) OVER() AS total
+        FROM minion_workers
+        WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL)
+        ORDER BY id DESC LIMIT $3 OFFSET $4
+      `,
+      before,
+      ids,
+      limit,
+      offset
+    );
 
     return {total: _removeTotal(results), workers: results};
   }
@@ -230,7 +248,7 @@ export class PgBackend {
   async lock(name: string, duration: number, options: LockOptions = {}): Promise<boolean> {
     const limit = options.limit ?? 1;
     const results = await this.pg.query<LockResult>`SELECT * FROM minion_lock(${name}, ${duration}, ${limit})`;
-    return results[0].minion_lock;
+    return results.first.minion_lock;
   }
 
   async note(id: MinionJobId, merge: Record<string, any>): Promise<boolean> {
@@ -246,7 +264,7 @@ export class PgBackend {
       WHERE new.id = old.id AND old.inbox != '[]'
       RETURNING old.inbox AS inbox
     `;
-    return results[0]?.inbox ?? [];
+    return results.first?.inbox ?? [];
   }
 
   async registerWorker(id?: MinionWorkerId, options: RegisterWorkerOptions = {}): Promise<MinionWorkerId> {
@@ -257,7 +275,7 @@ export class PgBackend {
         ON CONFLICT(id) DO UPDATE SET notified = now(), status = ${status}
         RETURNING id
     `;
-    return results.first?.id ?? 0;
+    return results.first.id;
   }
 
   async removeJob(id: MinionJobId): Promise<boolean> {
@@ -308,23 +326,24 @@ export class PgBackend {
   }
 
   async retryJob(id: MinionJobId, retries: number, options: RetryOptions = {}): Promise<boolean> {
-    const attempts = options.attempts;
-    const delay = options.delay ?? 0;
-    const expire = options.expire;
-    const lax = options.lax;
-    const parents = options.parents;
-    const priority = options.priority;
-    const queue = options.queue;
-
-    const results = await this.pg.query`
-      UPDATE minion_jobs SET attempts = COALESCE(${attempts}, attempts),
-        delayed = (NOW() + (INTERVAL '1 second' * ${delay})),
-        expires = CASE WHEN ${expire}::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * ${expire}::BIGINT)
-                       ELSE expires END, lax = COALESCE(${lax}, lax), parents = COALESCE(${parents}, parents),
-        priority = COALESCE(${priority}, priority), queue = COALESCE(${queue}, queue), retried = NOW(),
-        retries = retries + 1, state = 'inactive'
-      WHERE id = ${id} AND retries = ${retries}
-    `;
+    const results = await this.pg.rawQuery(
+      `
+        UPDATE minion_jobs SET attempts = COALESCE($1, attempts), delayed = (NOW() + (INTERVAL '1 second' * $2)),
+          expires = CASE WHEN $3::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * $3::BIGINT) ELSE expires END,
+          lax = COALESCE($4, lax), parents = COALESCE($5, parents), priority = COALESCE($6, priority),
+          queue = COALESCE($7, queue), retried = NOW(), retries = retries + 1, state = 'inactive'
+        WHERE id = $8 AND retries = $9
+      `,
+      options.attempts,
+      options.delay ?? 0,
+      options.expire,
+      options.lax,
+      options.parents,
+      options.priority,
+      options.queue,
+      id,
+      retries
+    );
 
     return (results.count ?? 0) > 0 ? true : false;
   }
@@ -332,8 +351,8 @@ export class PgBackend {
   async setup(): Promise<void> {
     const pg = this.pg;
 
-    const version = (await pg.query<ServerVersionResult>`SHOW server_version_num`).first?.server_version_num;
-    if (version == null || version < 90500) throw new Error('PostgreSQL 9.5 or later is required');
+    const version = (await pg.query<ServerVersionResult>`SHOW server_version_num`).first.server_version_num;
+    if (version < 90500) throw new Error('PostgreSQL 9.5 or later is required');
 
     const migrations = pg.migrations;
     await migrations.fromFile(Path.currentFile().dirname().sibling('migrations', 'minion.sql'), {name: 'minion'});
@@ -355,7 +374,7 @@ export class PgBackend {
       FROM minion_jobs
     `;
 
-    const stats = results[0];
+    const stats = results.first;
     stats.inactive_workers = stats.workers - stats.active_workers;
     return stats;
   }
