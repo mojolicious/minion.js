@@ -1,0 +1,46 @@
+name: macOS
+on: [push, pull_request]
+jobs:
+  test:
+    name: Node ${{ matrix.node-version }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16.x, 17.x, 18.x]
+        os: [macos-latest]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Use Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: PostgreSQL Setup
+        run: |
+          brew services start postgresql
+          echo "Check PostgreSQL service is running"
+          i=10
+          COMMAND='pg_isready'
+          while [ $i -gt 0 ]; do
+            echo "Check PostgreSQL service status"
+            eval $COMMAND && break
+            ((i--))
+            if [ $i == 0 ]; then
+              echo "PostgreSQL service not ready, all attempts exhausted"
+              exit 1
+            fi
+            echo "PostgreSQL service not ready, wait 10 more sec, attempts left: $i"
+            sleep 10
+          done
+          psql --command="CREATE USER testuser PASSWORD 'testpassword'" --command="\du" postgres
+          createdb --owner=testuser testdatabase
+          PGPASSWORD=testpassword psql --username=testuser --host=localhost --list testdatabase
+      - name: npm install
+        run: npm i
+      - name: npm run build
+        run: npm run build
+      - name: npm test
+        run: npm test
+        env:
+          TEST_ONLINE: postgresql://testuser:testpassword@localhost:5432/testdatabase

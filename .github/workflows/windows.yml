@@ -1,0 +1,35 @@
+name: Windows
+on: [push, pull_request]
+jobs:
+  test:
+    name: Node ${{ matrix.node-version }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [16.x, 17.x, 18.x]
+        os: [windows-latest]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Use Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: PostgreSQL Setup
+        run: |
+          $pgService = Get-Service -Name postgresql*
+          Set-Service -InputObject $pgService -Status running -StartupType automatic
+          Start-Process -FilePath "$env:PGBIN\pg_isready" -Wait -PassThru
+          & $env:PGBIN\psql --command="CREATE USER testuser PASSWORD 'testpassword'" --command="\du"
+          & $env:PGBIN\createdb --owner=testuser testdatabase
+          $env:PGPASSWORD = 'testpassword'
+          & $env:PGBIN\psql --username=testuser --host=localhost --list testdatabase
+      - name: npm install
+        run: npm i
+      - name: npm run build
+        run: npm run build
+      - name: npm test
+        run: npm test
+        env:
+          TEST_ONLINE: postgresql://testuser:testpassword@localhost:5432/testdatabase
