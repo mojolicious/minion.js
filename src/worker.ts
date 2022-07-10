@@ -1,18 +1,19 @@
 import type Minion from './minion.js';
-import type {DequeueOptions, WorkerInfo} from './types.js';
+import type {DequeueOptions, WorkerInfo, WorkerOptions} from './types.js';
 import {Job} from './job.js';
 
 /**
  * Minion worker class.
  */
 export class Worker {
-  status: Record<string, any> = {};
+  status: Record<string, any>;
 
   _id: number | undefined = undefined;
   _minion: Minion;
 
-  constructor(minion: Minion) {
+  constructor(minion: Minion, options: WorkerOptions = {}) {
     this._minion = minion;
+    this.status = options.status ?? {};
   }
 
   async dequeue(wait: number, options: DequeueOptions = {}): Promise<Job | null> {

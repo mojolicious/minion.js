@@ -274,6 +274,57 @@ t.test('PostgreSQL backend', skip, async t => {
     t.notOk(batch4[1]);
     await worker.unregister();
     await worker2.unregister();
+
+    await minion.reset({all: true});
+
+    const worker3 = await minion.worker({status: {test: 'one'}}).register();
+    const worker4 = await minion.worker({status: {test: 'two'}}).register();
+    const worker5 = await minion.worker({status: {test: 'three'}}).register();
+    const worker6 = await minion.worker({status: {test: 'four'}}).register();
+    const worker7 = await minion.worker({status: {test: 'five'}}).register();
+    const workers = minion.workers();
+    workers.fetch = 2;
+    t.notOk(workers.options.before);
+    t.equal((await workers.next()).status.test, 'five');
+    t.equal(workers.options.before, 4);
+    t.equal((await workers.next()).status.test, 'four');
+    t.equal((await workers.next()).status.test, 'three');
+    t.equal(workers.options.before, 2);
+    t.equal((await workers.next()).status.test, 'two');
+    t.equal((await workers.next()).status.test, 'one');
+    t.equal(workers.options.before, 1);
+    t.notOk(await workers.next());
+
+    const workers1 = minion.workers({ids: [2, 4, 1]});
+    const result = [];
+    for await (const worker of workers1) {
+      result.push(worker.status.test);
+    }
+    t.same(result, ['four', 'two', 'one']);
+
+    const workers2 = minion.workers({ids: [2, 4, 1]});
+    t.notOk(workers2.options.before);
+    t.equal((await workers2.next()).status.test, 'four');
+    t.equal(workers2.options.before, 1);
+    t.equal((await workers2.next()).status.test, 'two');
+    t.equal((await workers2.next()).status.test, 'one');
+    t.notOk(await workers2.next());
+
+    const workers3 = minion.workers();
+    workers3.fetch = 2;
+    t.equal((await workers3.next()).status.test, 'five');
+    t.equal((await workers3.next()).status.test, 'four');
+    t.equal(await workers3.total(), 5);
+    await worker7.unregister();
+    await worker6.unregister();
+    await worker5.unregister();
+    t.equal((await workers3.next()).status.test, 'two');
+    t.equal((await workers3.next()).status.test, 'one');
+    t.notOk(await workers3.next());
+    t.equal(await workers3.total(), 4);
+    t.equal(await minion.workers().total(), 2);
+    await worker4.unregister();
+    await worker3.unregister();
   });
 
   await t.test('Exclusive lock', async t => {

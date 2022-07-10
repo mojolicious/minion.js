@@ -1,12 +1,15 @@
 import type {
   EnqueueOptions,
   JobInfo,
+  ListWorkersOptions,
   LockOptions,
   MinionArgs,
   MinionBackend,
   MinionJobId,
   MinionTask,
-  ResetOptions
+  ResetOptions,
+  WorkerInfo,
+  WorkerOptions
 } from './types.js';
 import type {MojoApp} from '@mojojs/core';
 import {Job} from './job.js';
@@ -94,8 +97,12 @@ export default class Minion {
     return await this.backend.unlock(name);
   }
 
-  worker(): Worker {
-    return new Worker(this);
+  worker(options?: WorkerOptions): Worker {
+    return new Worker(this, options);
+  }
+
+  workers(options: ListWorkersOptions = {}): BackendIterator<WorkerInfo> {
+    return new BackendIterator<WorkerInfo>(this, 'workers', options);
   }
 
   async _result(
@@ -116,6 +123,61 @@ export default class Minion {
       reject(new AbortError());
     } else {
       setTimeout(() => this._result(id, interval, signal, resolve, reject), interval);
+    }
+  }
+}
+
+class BackendIterator<T> {
+  fetch = 10;
+  options: ListWorkersOptions;
+
+  _cache: T[] = [];
+  _count = 0;
+  _minion: Minion;
+  _name: string;
+  _total = 0;
+
+  constructor(minion: Minion, name: string, options: ListWorkersOptions) {
+    this.options = options;
+
+    this._minion = minion;
+    this._name = name;
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const backendIterator = this;
+    return {
+      async next(): Promise<IteratorResult<T>> {
+        const value = (await backendIterator.next()) as any;
+        return {value, done: value === undefined};
+      }
+    };
+  }
+
+  async next(): Promise<T | undefined> {
+    const cache = this._cache;
+    if (cache.length < 1) await this._fetch();
+    return cache.shift();
+  }
+
+  async total(): Promise<number> {
+    if (this._total === 0) await this._fetch();
+    return this._total;
+  }
+
+  async _fetch(): Promise<void> {
+    const name = this._name;
+    const methodName = name === 'workers' ? 'listWorkers' : 'listJobs';
+    const results = (await this._minion.backend[methodName](0, this.fetch, this.options)) as any;
+    const batch = results[name];
+
+    const len = batch.length;
+    if (len > 0) {
+      this._total = results.total + this._count;
+      this._count += len;
+      this._cache.push(...batch);
+      this.options.before = batch[batch.length - 1].id;
     }
   }
 }

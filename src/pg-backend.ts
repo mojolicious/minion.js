@@ -315,8 +315,8 @@ export class PgBackend {
   }
 
   async reset(options: ResetOptions): Promise<void> {
-    if (options.all === true) this.pg.query`TRUNCATE minion_jobs, minion_locks, minion_workers RESTART IDENTITY`;
-    if (options.locks === true) this.pg.query`TRUNCATE minion_locks`;
+    if (options.all === true) await this.pg.query`TRUNCATE minion_jobs, minion_locks, minion_workers RESTART IDENTITY`;
+    if (options.locks === true) await this.pg.query`TRUNCATE minion_locks`;
   }
 
   async retryJob(id: MinionJobId, retries: number, options: RetryOptions = {}): Promise<boolean> {

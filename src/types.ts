@@ -89,6 +89,10 @@ export interface RetryOptions {
   queue?: string;
 }
 
+export interface WorkerOptions {
+  status?: Record<string, any>;
+}
+
 export interface DequeuedJob {
   id: MinionJobId;
   args: MinionArgs;
