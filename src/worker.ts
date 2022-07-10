@@ -39,7 +39,7 @@ export class Worker {
   }
 
   async register(): Promise<this> {
-    const id = await this.minion.backend.registerWorker(this._id, this.status);
+    const id = await this.minion.backend.registerWorker(this._id, {status: this.status});
     if (this._id === undefined) this._id = id;
     return this;
   }

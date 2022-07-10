@@ -239,6 +239,43 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('List workers', async t => {
+    const worker = await minion.worker().register();
+    const worker2 = minion.worker();
+    worker2.status.whatever = 'works!';
+    await worker2.register();
+    const results = await minion.backend.listWorkers(0, 10);
+    t.equal(results.total, 2);
+
+    const host = os.hostname();
+    const batch = results.workers;
+    t.equal(batch[0].id, worker2.id);
+    t.equal(batch[0].host, host);
+    t.equal(batch[0].pid, process.pid);
+    t.same(batch[0].started instanceof Date, true);
+    t.equal(batch[1].id, worker.id);
+    t.equal(batch[1].host, host);
+    t.equal(batch[1].pid, process.pid);
+    t.same(batch[1].started instanceof Date, true);
+    t.notOk(batch[2]);
+
+    const results2 = await minion.backend.listWorkers(0, 1);
+    const batch2 = results2.workers;
+    t.equal(results2.total, 2);
+    t.equal(batch2[0].id, worker2.id);
+    t.same(batch2[0].status, {whatever: 'works!'});
+    t.notOk(batch2[1]);
+    worker2.status.whatever = 'works too!';
+    await worker2.register();
+    const batch3 = (await minion.backend.listWorkers(0, 1)).workers;
+    t.same(batch3[0].status, {whatever: 'works too!'});
+    const batch4 = (await minion.backend.listWorkers(1, 1)).workers;
+    t.equal(batch4[0].id, worker.id);
+    t.notOk(batch4[1]);
+    await worker.unregister();
+    await worker2.unregister();
+  });
+
   await t.test('Exclusive lock', async t => {
     t.ok(await minion.lock('foo', 3600));
     t.ok(!(await minion.lock('foo', 3600)));

@@ -180,12 +180,9 @@ export class PgBackend {
     const results = await this.pg.rawQuery<ListJobsResult>(
       `
         SELECT id, args, attempts,
-            ARRAY(SELECT id FROM minion_jobs WHERE parents @> ARRAY[j.id]) AS children,
-            EXTRACT(epoch FROM created) AS created, EXTRACT(EPOCH FROM delayed) AS delayed,
-            EXTRACT(EPOCH FROM expires) AS expires, EXTRACT(EPOCH FROM finished) AS finished, lax, notes, parents,
-            priority, queue, result, EXTRACT(EPOCH FROM retried) AS retried, retries,
-            EXTRACT(EPOCH FROM started) AS started, state, task, EXTRACT(EPOCH FROM now()) AS time,
-            COUNT(*) OVER() AS total, worker
+            ARRAY(SELECT id FROM minion_jobs WHERE parents @> ARRAY[j.id]) AS children, created, delayed, expires,
+            finished, lax, notes, parents, priority, queue, result, retried, retries, started, state, task,
+            now() AS time, COUNT(*) OVER() AS total, worker
           FROM minion_jobs AS j
           WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL) AND (notes ? ANY ($3) OR $3 IS NULL)
             AND (queue = ANY ($4) OR $4 IS NULL) AND (state = ANY ($5) OR $5 IS NULL)
@@ -211,7 +208,7 @@ export class PgBackend {
 
     const results = await this.pg.rawQuery<ListLockResult>(
       `
-        SELECT name, EXTRACT(EPOCH FROM expires) AS expires, COUNT(*) OVER() AS total FROM minion_locks
+        SELECT name, expires, COUNT(*) OVER() AS total FROM minion_locks
         WHERE expires > NOW() AND (name = ANY ($1) OR $1 IS NULL)
         ORDER BY id DESC LIMIT $2 OFFSET $2
       `,
@@ -224,20 +221,17 @@ export class PgBackend {
   }
 
   async listWorkers(offset: number, limit: number, options: ListWorkersOptions = {}): Promise<WorkerList> {
-    const before = options.before;
-    const ids = options.ids ?? [];
-
     const results = await this.pg.rawQuery<ListWorkersResult>(
       `
         SELECT id, notified, ARRAY(
             SELECT id FROM minion_jobs WHERE state = 'active' AND worker = minion_workers.id
-          ) AS jobs, host, pid, status, started, COUNT(*) OVER() AS total
+        ) AS jobs, host, pid, status, started, COUNT(*) OVER() AS total
         FROM minion_workers
-        WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL)
+        WHERE (id < $1 OR $1 IS NULL)  AND (id = ANY ($2) OR $2 IS NULL)
         ORDER BY id DESC LIMIT $3 OFFSET $4
       `,
-      before,
-      ids,
+      options.before,
+      options.ids,
       limit,
       offset
     );
