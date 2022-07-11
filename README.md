@@ -1,8 +1,5 @@
-<p align="center">
-  <a href="https://mojojs.org">
-    <img src="https://github.com/mojolicious/mojo.js/blob/main/docs/images/logo.png?raw=true" style="margin: 0 auto;">
-  </a>
-</p>
+
+![Screenshot](https://raw.github.com/mojolicious/minion.js/main/examples/admin.png?raw=true)
 
 [![](https://github.com/mojolicious/minion.js/workflows/test/badge.svg)](https://github.com/mojolicious/minion.js/actions)
 [![Coverage Status](https://coveralls.io/repos/github/mojolicious/minion.js/badge.svg?branch=main)](https://coveralls.io/github/mojolicious/minion.js?branch=main)
