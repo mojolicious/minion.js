@@ -398,6 +398,30 @@ t.test('PostgreSQL backend', skip, async t => {
     t.same((await minion.backend.listLocks(0, 10)).total, 0);
   });
 
+  await t.test('Reset (locks)', async t => {
+    await minion.enqueue('test');
+    await minion.lock('test', 3600);
+    await minion.worker().register();
+    t.equal((await minion.backend.listJobs(0, 1)).total, 1);
+    t.equal((await minion.backend.listLocks(0, 1)).total, 1);
+    t.equal((await minion.backend.listWorkers(0, 1)).total, 1);
+    await minion.reset({locks: true});
+    t.equal((await minion.backend.listJobs(0, 1)).total, 1);
+    t.equal((await minion.backend.listLocks(0, 1)).total, 0);
+    t.equal((await minion.backend.listWorkers(0, 1)).total, 1);
+  });
+
+  await t.test('Reset (all)', async t => {
+    await minion.lock('test', 3600);
+    t.equal((await minion.backend.listJobs(0, 1)).total, 1);
+    t.equal((await minion.backend.listLocks(0, 1)).total, 1);
+    t.equal((await minion.backend.listWorkers(0, 1)).total, 1);
+    await minion.reset({all: true});
+    t.equal((await minion.backend.listJobs(0, 1)).total, 0);
+    t.equal((await minion.backend.listLocks(0, 1)).total, 0);
+    t.equal((await minion.backend.listWorkers(0, 1)).total, 0);
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
