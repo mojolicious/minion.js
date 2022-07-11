@@ -31,6 +31,20 @@ export type MinionJobId = number;
 export type MinionWorkerId = number;
 export type MinionTask = (job: Job, ...args: MinionArgs) => Promise<void>;
 
+export interface MinionStats {
+  active_locks: number;
+  active_jobs: number;
+  active_workers: number;
+  delayed_jobs: number;
+  enqueued_jobs: number;
+  failed_jobs: number;
+  finished_jobs: number;
+  inactive_jobs: number;
+  inactive_workers: number;
+  uptime: number;
+  workers: number;
+}
+
 export interface DequeueOptions {
   id?: MinionJobId;
   minPriority?: number;

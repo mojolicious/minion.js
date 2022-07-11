@@ -364,6 +364,40 @@ t.test('PostgreSQL backend', skip, async t => {
     t.ok(!(await minion.unlock('baz')));
   });
 
+  await t.test('List locks', async t => {
+    t.equal((await minion.stats()).active_locks, 1);
+    const results = await minion.backend.listLocks(0, 2);
+    t.equal(results.locks[0].name, 'foo');
+    t.same(results.locks[0].expires instanceof Date, true);
+    t.notOk(results.locks[1]);
+    t.equal(results.total, 1);
+    await minion.unlock('foo');
+
+    await minion.lock('yada', 3600, {limit: 2});
+    await minion.lock('test', 3600, {limit: 1});
+    await minion.lock('yada', 3600, {limit: 2});
+    t.equal((await minion.stats()).active_locks, 3);
+    const results2 = await minion.backend.listLocks(1, 1);
+    t.equal(results2.locks[0].name, 'test');
+    t.same(results2.locks[0].expires instanceof Date, true);
+    t.notOk(results2.locks[1]);
+    t.equal(results2.total, 3);
+
+    const results3 = await minion.backend.listLocks(0, 10, {names: ['yada']});
+    t.equal(results3.locks[0].name, 'yada');
+    t.same(results3.locks[0].expires instanceof Date, true);
+    t.equal(results3.locks[1].name, 'yada');
+    t.same(results3.locks[1].expires instanceof Date, true);
+    t.notOk(results3.locks[2]);
+    t.equal(results3.total, 2);
+
+    await minion.backend.pg
+      .query`UPDATE minion_locks SET expires = NOW() - INTERVAL '1 second' * 1 WHERE name = 'yada'`;
+    await minion.unlock('test');
+    t.equal((await minion.stats()).active_locks, 0);
+    t.same((await minion.backend.listLocks(0, 10)).total, 0);
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 

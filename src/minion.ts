@@ -6,6 +6,7 @@ import type {
   MinionArgs,
   MinionBackend,
   MinionJobId,
+  MinionStats,
   MinionTask,
   ResetOptions,
   WorkerInfo,
@@ -91,6 +92,10 @@ export default class Minion {
 
   async setup(): Promise<void> {
     await this.backend.setup();
+  }
+
+  async stats(): Promise<MinionStats> {
+    return await this.backend.stats();
   }
 
   async unlock(name: string): Promise<boolean> {

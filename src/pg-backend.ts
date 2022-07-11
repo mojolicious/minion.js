@@ -13,6 +13,7 @@ import type {
   LockList,
   MinionArgs,
   MinionJobId,
+  MinionStats,
   MinionWorkerId,
   RegisterWorkerOptions,
   ResetOptions,
@@ -204,15 +205,13 @@ export class PgBackend {
   }
 
   async listLocks(offset: number, limit: number, options: ListLocksOptions = {}): Promise<LockList> {
-    const names = options.names;
-
     const results = await this.pg.rawQuery<ListLockResult>(
       `
         SELECT name, expires, COUNT(*) OVER() AS total FROM minion_locks
         WHERE expires > NOW() AND (name = ANY ($1) OR $1 IS NULL)
-        ORDER BY id DESC LIMIT $2 OFFSET $2
+        ORDER BY id DESC LIMIT $2 OFFSET $3
       `,
-      names,
+      options.names,
       limit,
       offset
     );
@@ -353,8 +352,8 @@ export class PgBackend {
     await migrations.migrate();
   }
 
-  async stats(): Promise<any> {
-    const results = await this.pg.query`
+  async stats(): Promise<MinionStats> {
+    const results = await this.pg.query<MinionStats>`
       SELECT COUNT(*) FILTER (WHERE state = 'inactive' AND (expires IS NULL OR expires > NOW())) AS inactive_jobs,
         COUNT(*) FILTER (WHERE state = 'active') AS active_jobs,
         COUNT(*) FILTER (WHERE state = 'failed') AS failed_jobs,
