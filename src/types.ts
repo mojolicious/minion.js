@@ -31,6 +31,10 @@ export type MinionJobId = number;
 export type MinionWorkerId = number;
 export type MinionTask = (job: Job, ...args: MinionArgs) => Promise<void>;
 
+export interface MinionHistory {
+  daily: DailyHistory[];
+}
+
 export interface MinionStats {
   active_locks: number;
   active_jobs: number;
@@ -105,6 +109,12 @@ export interface RetryOptions {
 
 export interface WorkerOptions {
   status?: Record<string, any>;
+}
+
+export interface DailyHistory {
+  epoch: number;
+  failed_jobs: number;
+  finished_jobs: number;
 }
 
 export interface DequeuedJob {

@@ -1,5 +1,6 @@
 import type Minion from './minion.js';
 import type {
+  DailyHistory,
   DequeueOptions,
   DequeuedJob,
   EnqueueOptions,
@@ -12,6 +13,7 @@ import type {
   LockOptions,
   LockList,
   MinionArgs,
+  MinionHistory,
   MinionJobId,
   MinionStats,
   MinionWorkerId,
@@ -157,8 +159,8 @@ export class PgBackend {
     return await this._update('finished', id, retries, result);
   }
 
-  async history(): Promise<any> {
-    const results = await this.pg.query`
+  async history(): Promise<MinionHistory> {
+    const results = await this.pg.query<DailyHistory>`
       SELECT EXTRACT(EPOCH FROM ts) AS epoch, COALESCE(failed_jobs, 0) AS failed_jobs,
         COALESCE(finished_jobs, 0) AS finished_jobs
       FROM (

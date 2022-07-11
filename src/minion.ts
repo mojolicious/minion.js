@@ -5,6 +5,7 @@ import type {
   LockOptions,
   MinionArgs,
   MinionBackend,
+  MinionHistory,
   MinionJobId,
   MinionStats,
   MinionTask,
@@ -59,6 +60,10 @@ export default class Minion {
 
   async enqueue(task: string, args?: MinionArgs, options?: EnqueueOptions): Promise<MinionJobId> {
     return await this.backend.enqueue(task, args, options);
+  }
+
+  async history(): Promise<MinionHistory> {
+    return await this.backend.history();
   }
 
   async isLocked(name: string): Promise<boolean> {
