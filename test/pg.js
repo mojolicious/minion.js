@@ -422,6 +422,74 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal((await minion.backend.listWorkers(0, 1)).total, 0);
   });
 
+  await t.test('Stats)', async t => {
+    minion.addTask('add', async (job, first, second) => {
+      await job.finish({added: first + second});
+    });
+    minion.addTask('fail', async () => {
+      throw new Error('Intentional failure!');
+    });
+
+    const stats = await minion.stats();
+    t.equal(stats.workers, 0);
+    t.equal(stats.active_workers, 0);
+    t.equal(stats.inactive_workers, 0);
+    t.equal(stats.enqueued_jobs, 0);
+    t.equal(stats.active_jobs, 0);
+    t.equal(stats.failed_jobs, 0);
+    t.equal(stats.finished_jobs, 0);
+    t.equal(stats.inactive_jobs, 0);
+    t.equal(stats.delayed_jobs, 0);
+    t.equal(stats.active_locks, 0);
+    t.ok(stats.uptime);
+
+    const worker = await minion.worker().register();
+    t.equal((await minion.stats()).workers, 1);
+    t.equal((await minion.stats()).inactive_workers, 1);
+    await minion.enqueue('fail');
+    t.equal((await minion.stats()).enqueued_jobs, 1);
+    await minion.enqueue('fail');
+    t.equal((await minion.stats()).enqueued_jobs, 2);
+    t.equal((await minion.stats()).inactive_jobs, 2);
+
+    const job = await worker.dequeue(0);
+    const stats2 = await minion.stats();
+    t.equal(stats2.workers, 1);
+    t.equal(stats2.active_workers, 1);
+    t.equal(stats2.active_jobs, 1);
+    t.equal(stats2.inactive_jobs, 1);
+
+    await minion.enqueue('fail');
+    const job2 = await worker.dequeue(0);
+    const stats3 = await minion.stats();
+    t.equal(stats3.active_workers, 1);
+    t.equal(stats3.active_jobs, 2);
+    t.equal(stats3.inactive_jobs, 1);
+
+    t.same(await job2.finish(), true);
+    t.same(await job.finish(), true);
+    t.equal((await minion.stats()).finished_jobs, 2);
+    const job3 = await worker.dequeue(0);
+    t.same(await job3.fail(), true);
+    t.equal((await minion.stats()).failed_jobs, 1);
+    t.same(await job3.retry(), true);
+    t.equal((await minion.stats()).failed_jobs, 0);
+
+    const job4 = await worker.dequeue(0);
+    await job4.finish(['works']);
+    await worker.unregister();
+    const stats4 = await minion.stats();
+    t.equal(stats4.workers, 0);
+    t.equal(stats4.active_workers, 0);
+    t.equal(stats4.inactive_workers, 0);
+    t.equal(stats4.active_jobs, 0);
+    t.equal(stats4.failed_jobs, 0);
+    t.equal(stats4.finished_jobs, 3);
+    t.equal(stats4.inactive_jobs, 0);
+
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
