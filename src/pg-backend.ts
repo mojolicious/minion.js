@@ -184,7 +184,7 @@ export class PgBackend {
           delayed, expires, finished, lax, notes, parents, priority, queue, result, retried, retries, started, state,
           task, now() AS time, COUNT(*) OVER() AS total, worker
         FROM minion_jobs AS j
-        WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL) AND (notes \? ANY ($3) OR $3 IS NULL)
+        WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL) AND (notes ? ANY ($3) OR $3 IS NULL)
           AND (queue = ANY ($4) OR $4 IS null) AND (state = ANY ($5) OR $5 IS NULL) AND (task = ANY ($6) OR $6 IS NULL)
           AND (state != 'inactive' OR expires IS null OR expires > NOW())
         ORDER BY id DESC
