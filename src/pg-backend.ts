@@ -340,17 +340,6 @@ export class PgBackend {
     return (results.count ?? 0) > 0 ? true : false;
   }
 
-  async setup(): Promise<void> {
-    const pg = this.pg;
-
-    const version = (await pg.query<ServerVersionResult>`SHOW server_version_num`).first.server_version_num;
-    if (version < 90500) throw new Error('PostgreSQL 9.5 or later is required');
-
-    const migrations = pg.migrations;
-    await migrations.fromFile(Path.currentFile().dirname().sibling('migrations', 'minion.sql'), {name: 'minion'});
-    await migrations.migrate();
-  }
-
   async stats(): Promise<MinionStats> {
     const results = await this.pg.query<MinionStats>`
       SELECT COUNT(*) FILTER (WHERE state = 'inactive' AND (expires IS NULL OR expires > NOW())) AS inactive_jobs,
@@ -382,6 +371,17 @@ export class PgBackend {
 
   async unregisterWorker(id: MinionWorkerId): Promise<void> {
     await this.pg.query`DELETE FROM minion_workers WHERE id = ${id}`;
+  }
+
+  async update(): Promise<void> {
+    const pg = this.pg;
+
+    const version = (await pg.query<ServerVersionResult>`SHOW server_version_num`).first.server_version_num;
+    if (version < 90500) throw new Error('PostgreSQL 9.5 or later is required');
+
+    const migrations = pg.migrations;
+    await migrations.fromFile(Path.currentFile().dirname().sibling('migrations', 'minion.sql'), {name: 'minion'});
+    await migrations.migrate();
   }
 
   async _try(id: MinionWorkerId, options: DequeueOptions): Promise<DequeuedJob | null> {

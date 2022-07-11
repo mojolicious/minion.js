@@ -13,7 +13,7 @@ t.test('PostgreSQL backend', skip, async t => {
   await pg.query`CREATE SCHEMA minion_backend_test`;
 
   const minion = new Minion(pg);
-  await minion.setup();
+  await minion.update();
 
   await t.test('Nothing to repair', async t => {
     await minion.repair();

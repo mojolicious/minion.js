@@ -90,16 +90,16 @@ export default class Minion {
     );
   }
 
-  async setup(): Promise<void> {
-    await this.backend.setup();
-  }
-
   async stats(): Promise<MinionStats> {
     return await this.backend.stats();
   }
 
   async unlock(name: string): Promise<boolean> {
     return await this.backend.unlock(name);
+  }
+
+  async update(): Promise<void> {
+    await this.backend.update();
   }
 
   worker(options?: WorkerOptions): Worker {

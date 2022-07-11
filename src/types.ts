@@ -19,10 +19,10 @@ export interface MinionBackend {
   repair: () => Promise<void>;
   reset: (options: ResetOptions) => Promise<void>;
   retryJob: (id: MinionJobId, retries: number, options: RetryOptions) => Promise<boolean>;
-  setup: () => Promise<void>;
   stats: () => Promise<any>;
   unlock: (name: string) => Promise<boolean>;
   unregisterWorker: (id: MinionWorkerId) => Promise<void>;
+  update: () => Promise<void>;
 }
 
 export type MinionArgs = any[];
