@@ -508,6 +508,123 @@ t.test('PostgreSQL backend', skip, async t => {
     t.ok(history.daily[23].epoch);
   });
 
+  await t.test('List jobs', async t => {
+    await minion.enqueue('add');
+    t.equal((await minion.backend.listJobs(1, 1)).total, 5);
+    const results = await minion.backend.listJobs(0, 10);
+    const batch = results.jobs;
+    t.equal(results.total, 5);
+    t.ok(batch[0].id);
+    t.equal(batch[0].task, 'add');
+    t.equal(batch[0].state, 'inactive');
+    t.equal(batch[0].retries, 0);
+    t.same(batch[0].created instanceof Date, true);
+    t.equal(batch[2].task, 'fail');
+    t.same(batch[2].args, []);
+    t.same(batch[2].notes, {});
+    t.same(batch[2].result, ['works']);
+    t.equal(batch[2].state, 'finished');
+    t.equal(batch[2].priority, 0);
+    t.same(batch[2].parents, []);
+    t.same(batch[2].children, []);
+    t.equal(batch[2].retries, 1);
+    t.same(batch[2].created instanceof Date, true);
+    t.same(batch[2].delayed instanceof Date, true);
+    t.same(batch[2].finished instanceof Date, true);
+    t.same(batch[2].retried instanceof Date, true);
+    t.same(batch[2].started instanceof Date, true);
+    t.equal(batch[3].task, 'fail');
+    t.equal(batch[3].state, 'finished');
+    t.equal(batch[3].retries, 0);
+    t.equal(batch[4].task, 'fail');
+    t.equal(batch[4].state, 'finished');
+    t.equal(batch[4].retries, 0);
+    t.notOk(batch[5]);
+
+    const batch2 = (await minion.backend.listJobs(0, 10, {states: ['inactive']})).jobs;
+    t.equal(batch2[0].state, 'inactive');
+    t.equal(batch2[0].retries, 0);
+    t.notOk(batch2[1]);
+
+    const batch3 = (await minion.backend.listJobs(0, 10, {tasks: ['add']})).jobs;
+    t.equal(batch3[0].task, 'add');
+    t.equal(batch3[0].retries, 0);
+    t.notOk(batch3[1]);
+
+    const batch4 = (await minion.backend.listJobs(0, 10, {tasks: ['add', 'fail']})).jobs;
+    t.equal(batch4[0].task, 'add');
+    t.equal(batch4[1].task, 'fail');
+    t.equal(batch4[2].task, 'fail');
+    t.equal(batch4[3].task, 'fail');
+    t.equal(batch4[4].task, 'fail');
+    t.notOk(batch4[5]);
+
+    const batch5 = (await minion.backend.listJobs(0, 10, {queues: ['default']})).jobs;
+    t.equal(batch5[0].queue, 'default');
+    t.equal(batch5[1].queue, 'default');
+    t.equal(batch5[2].queue, 'default');
+    t.equal(batch5[3].queue, 'default');
+    t.equal(batch5[4].queue, 'default');
+    t.notOk(batch5[5]);
+
+    const id = await minion.enqueue('test', [], {notes: {isTest: true}});
+    const batch6 = (await minion.backend.listJobs(0, 10, {notes: ['isTest']})).jobs;
+    t.equal(batch6[0].id, id);
+    t.equal(batch6[0].task, 'test');
+    t.same(batch6[0].notes, {isTest: true});
+    t.notOk(batch6[1]);
+    await (await minion.job(id)).remove();
+
+    const batch7 = (await minion.backend.listJobs(0, 10, {queues: ['does_not_exist']})).jobs;
+    t.notOk(batch7[0]);
+
+    const results4 = await minion.backend.listJobs(0, 1);
+    const batch8 = results4.jobs;
+    t.equal(results4.total, 5);
+    t.equal(batch8[0].state, 'inactive');
+    t.equal(batch8[0].retries, 0);
+    t.notOk(batch8[1]);
+
+    const batch9 = (await minion.backend.listJobs(2, 1)).jobs;
+    t.equal(batch9[0].state, 'finished');
+    t.equal(batch9[0].retries, 1);
+    t.notOk(batch9[1]);
+
+    const jobs = minion.jobs();
+    t.equal((await jobs.next()).task, 'add');
+    t.equal(jobs.options.before, 1);
+    t.equal((await jobs.next()).task, 'fail');
+    t.equal((await jobs.next()).task, 'fail');
+    t.equal((await jobs.next()).task, 'fail');
+    t.equal((await jobs.next()).task, 'fail');
+    t.notOk(await jobs.next());
+    t.equal(await jobs.total(), 5);
+
+    const jobs2 = minion.jobs({states: ['inactive']});
+    t.equal(await jobs2.total(), 1);
+    t.equal((await jobs2.next()).task, 'add');
+    t.notOk(await jobs2.next());
+
+    const jobs3 = minion.jobs({states: ['active']});
+    t.notOk(await jobs3.next());
+
+    const jobs4 = minion.jobs();
+    t.notOk(jobs4.options.before);
+    jobs4.fetch = 2;
+    t.equal((await jobs4.next()).task, 'add');
+    t.equal(jobs4.options.before, 4);
+    t.equal((await jobs4.next()).task, 'fail');
+    t.equal(jobs4.options.before, 4);
+    t.equal((await jobs4.next()).task, 'fail');
+    t.equal(jobs4.options.before, 2);
+    t.equal((await jobs4.next()).task, 'fail');
+    t.equal(jobs4.options.before, 2);
+    t.equal((await jobs4.next()).task, 'fail');
+    t.equal(jobs4.options.before, 1);
+    t.notOk(await jobs4.next());
+    t.equal(await jobs4.total(), 5);
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
