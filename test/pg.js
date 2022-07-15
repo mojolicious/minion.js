@@ -930,6 +930,30 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Multiple attempts during maintenance', async t => {
+    const id = await minion.enqueue('fail', [], {attempts: 2});
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.equal(job.retries, 0);
+    t.equal((await job.info()).attempts, 2);
+    t.equal((await job.info()).state, 'active');
+    await worker.unregister();
+    await minion.repair();
+    t.equal((await job.info()).state, 'inactive');
+    t.match((await job.info()).result, 'Worker went away');
+    t.ok((await job.info()).retried < (await job.info()).delayed);
+    await minion.backend.pg.query`UPDATE minion_jobs SET delayed = NOW() WHERE id = ${id}`;
+    const worker2 = await minion.worker().register();
+    const job2 = await worker2.dequeue(0);
+    t.equal(job2.id, id);
+    t.equal(job2.retries, 1);
+    await worker2.unregister();
+    await minion.repair();
+    t.equal((await job2.info()).state, 'failed');
+    t.match((await job2.info()).result, 'Worker went away');
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
