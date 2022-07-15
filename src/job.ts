@@ -20,7 +20,7 @@ export class Job {
     this.task = task;
   }
 
-  async fail(result?: any): Promise<boolean> {
+  async fail(result: any = 'Unknown error'): Promise<boolean> {
     return await this.minion.backend.failJob(this.id, this.retries, result);
   }
 
@@ -43,7 +43,7 @@ export class Job {
       await task(this, ...this.args);
       await this.finish();
     } catch (error) {
-      await this.fail(error);
+      await this.fail(error instanceof Error ? {name: error.name, message: error.message, stack: error.stack} : error);
     }
   }
 

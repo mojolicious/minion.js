@@ -821,6 +821,33 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Failed jobs', async t => {
+    const id = await minion.enqueue('add', [5, 6]);
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.notOk((await job.info()).result);
+    t.ok(await job.fail());
+    t.notOk(await job.finish());
+    t.equal((await job.info()).state, 'failed');
+    t.equal((await job.info()).result, 'Unknown error');
+
+    const id2 = await minion.enqueue('add', [6, 7]);
+    const job2 = await worker.dequeue(0);
+    t.equal(job2.id, id2);
+    t.ok(await job2.fail('Something bad happened'));
+    t.equal((await job2.info()).state, 'failed');
+    t.equal((await job2.info()).result, 'Something bad happened');
+
+    const id3 = await minion.enqueue('fail');
+    const job3 = await worker.dequeue(0);
+    t.equal(job3.id, id3);
+    await job3.perform();
+    t.equal((await job3.info()).state, 'failed');
+    t.match((await job3.info()).result, {message: /Intentional failure/});
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
