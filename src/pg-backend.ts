@@ -104,7 +104,7 @@ export class PgBackend {
 
   async dequeue(id: MinionWorkerId, wait: number, options: DequeueOptions): Promise<DequeuedJob | null> {
     const job = await this._try(id, options);
-    if (job !== undefined) return job;
+    if (job !== null) return job;
 
     const db = await this.pg.db();
     try {
@@ -409,7 +409,7 @@ export class PgBackend {
       RETURNING id, args, retries, task
     `;
 
-    return results.first;
+    return results.first ?? null;
   }
 
   async _update(state: 'finished' | 'failed', id: MinionJobId, retries: number, result?: any): Promise<boolean> {

@@ -713,6 +713,57 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Jobs with priority', async t => {
+    await minion.enqueue('add', [1, 2]);
+    const id = await minion.enqueue('add', [2, 4], {priority: 1});
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.equal((await job.info()).priority, 1);
+    t.ok(await job.finish());
+    t.not((await worker.dequeue(0)).id, id);
+    const id2 = await minion.enqueue('add', [2, 5]);
+    const job2 = await worker.dequeue(0);
+    t.equal(job2.id, id2);
+    t.equal((await job2.info()).priority, 0);
+    t.ok(await job2.finish());
+    t.ok(await job2.retry({priority: 100}));
+    const job3 = await worker.dequeue(0);
+    t.equal(job3.id, id2);
+    t.equal((await job3.info()).retries, 1);
+    t.equal((await job3.info()).priority, 100);
+    t.ok(await job3.finish());
+    t.ok(await job3.retry({priority: 0}));
+    const job4 = await worker.dequeue(0);
+    t.equal(job4.id, id2);
+    t.equal((await job4.info()).retries, 2);
+    t.equal((await job4.info()).priority, 0);
+    t.ok(await job4.finish());
+
+    const id3 = await minion.enqueue('add', [2, 6], {priority: 2});
+    t.notOk(await worker.dequeue(0, {minPriority: 5}));
+    t.notOk(await worker.dequeue(0, {minPriority: 3}));
+    const job5 = await worker.dequeue(0, {minPriority: 2});
+    t.equal(job5.id, id3);
+    t.equal((await job5.info()).priority, 2);
+    t.ok(await job5.finish());
+    await minion.enqueue('add', [2, 8], {priority: 0});
+    await minion.enqueue('add', [2, 7], {priority: 5});
+    await minion.enqueue('add', [2, 8], {priority: -2});
+    t.notOk(await worker.dequeue(0, {minPriority: 6}));
+    const job6 = await worker.dequeue(0, {minPriority: 0});
+    t.equal((await job6.info()).priority, 5);
+    t.ok(await job6.finish());
+    const job7 = await worker.dequeue(0, {minPriority: 0});
+    t.equal((await job7.info()).priority, 0);
+    t.ok(await job7.finish());
+    t.notOk(await worker.dequeue(0, {minPriority: 0}));
+    const job8 = await worker.dequeue(0, {minPriority: -10});
+    t.equal((await job8.info()).priority, -2);
+    t.ok(await job8.finish());
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
