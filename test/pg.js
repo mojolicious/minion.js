@@ -663,6 +663,56 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal((await job2.info()).state, 'finished');
   });
 
+  await t.test('Retry and remove', async t => {
+    const id = await minion.enqueue('add', [5, 6]);
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.equal((await job.info()).attempts, 1);
+    t.equal((await job.info()).retries, 0);
+    t.ok(await job.finish());
+
+    const job2 = await minion.job(id);
+    t.notOk((await job2.info()).retried);
+    t.ok(await job.retry());
+    t.same((await job2.info()).retried instanceof Date, true);
+    t.equal((await job2.info()).state, 'inactive');
+    t.equal((await job2.info()).retries, 1);
+
+    const job3 = await worker.dequeue(0);
+    t.equal((await job3.info()).retries, 1);
+    t.ok(await job3.retry());
+    t.equal(job3.id, id);
+    t.equal((await job3.info()).retries, 2);
+
+    const job4 = await worker.dequeue(0);
+    t.equal((await job4.info()).state, 'active');
+    t.ok(await job4.finish());
+    t.ok(await job4.remove());
+    t.notOk(await job4.retry());
+    t.notOk(await job4.info());
+
+    const id2 = await minion.enqueue('add', [6, 5]);
+    const job5 = await minion.job(id2);
+    t.equal((await job5.info()).state, 'inactive');
+    t.equal((await job5.info()).retries, 0);
+    t.ok(await job5.retry());
+    t.equal((await job5.info()).state, 'inactive');
+    t.equal((await job5.info()).retries, 1);
+
+    const job6 = await worker.dequeue(0);
+    t.equal(job6.id, id2);
+    t.ok(await job6.fail());
+    t.ok(await job6.remove());
+    t.notOk(await job6.info());
+
+    const id3 = await minion.enqueue('add', [5, 5]);
+    const job7 = await minion.job(id3);
+    t.ok(await job7.remove());
+
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
