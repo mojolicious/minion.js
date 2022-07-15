@@ -55,6 +55,10 @@ export default class Minion {
     this.tasks[name] = fn;
   }
 
+  backoff(retries: number): number {
+    return retries ** 4 + 15;
+  }
+
   async end(): Promise<void> {
     await this.backend.end();
   }

@@ -202,7 +202,7 @@ export class PgBackend {
       offset
     );
 
-    return {total: _removeTotal(results), jobs: results};
+    return {total: removeTotal(results), jobs: results};
   }
 
   async listLocks(offset: number, limit: number, options: ListLocksOptions = {}): Promise<LockList> {
@@ -217,7 +217,7 @@ export class PgBackend {
       offset
     );
 
-    return {total: _removeTotal(results), locks: results};
+    return {total: removeTotal(results), locks: results};
   }
 
   async listWorkers(offset: number, limit: number, options: ListWorkersOptions = {}): Promise<WorkerList> {
@@ -236,7 +236,7 @@ export class PgBackend {
       offset
     );
 
-    return {total: _removeTotal(results), workers: results};
+    return {total: removeTotal(results), workers: results};
   }
 
   async lock(name: string, duration: number, options: LockOptions = {}): Promise<boolean> {
@@ -386,6 +386,12 @@ export class PgBackend {
     await migrations.migrate();
   }
 
+  async _autoRetryJob(id: number, retries: number, attempts: number): Promise<boolean> {
+    if (attempts <= 1) return true;
+    const delay = this.minion.backoff(retries);
+    return this.retryJob(id, retries, {attempts: attempts > 1 ? attempts - 1 : 1, delay});
+  }
+
   async _try(id: MinionWorkerId, options: DequeueOptions): Promise<DequeuedJob | null> {
     const jobId = options.id;
     const minPriority = options.minPriority;
@@ -419,11 +425,13 @@ export class PgBackend {
       WHERE id = ${id} AND retries = ${retries} AND state = 'active'
       RETURNING attempts
     `;
-    return (results.count ?? 0) > 0 ? true : false;
+
+    if (results.length <= 0) return false;
+    return state === 'failed' ? this._autoRetryJob(id, retries, results.first.attempts) : true;
   }
 }
 
-function _removeTotal<T extends Array<{total?: number}>>(results: T): number {
+function removeTotal<T extends Array<{total?: number}>>(results: T): number {
   let total = 0;
   for (const result of results) {
     if (result.total !== undefined) total = result.total;

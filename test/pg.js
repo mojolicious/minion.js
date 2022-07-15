@@ -868,6 +868,68 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Multiple attempts while processing', async t => {
+    t.equal(minion.backoff(0), 15);
+    t.equal(minion.backoff(1), 16);
+    t.equal(minion.backoff(2), 31);
+    t.equal(minion.backoff(3), 96);
+    t.equal(minion.backoff(4), 271);
+    t.equal(minion.backoff(5), 640);
+    t.equal(minion.backoff(25), 390640);
+
+    const id = await minion.enqueue('fail', [], {attempts: 3});
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.equal(job.retries, 0);
+    const info = await job.info();
+    t.equal(info.attempts, 3);
+    t.equal(info.state, 'active');
+    await job.perform();
+    const info2 = await job.info();
+    t.equal(info2.attempts, 2);
+    t.equal(info2.state, 'inactive');
+    t.match(info2.result, {message: /Intentional failure/});
+    t.ok(info.retried < info.delayed);
+
+    await minion.backend.pg.query`UPDATE minion_jobs SET delayed = NOW() WHERE id = ${id}`;
+    const job2 = await worker.dequeue(0);
+    t.equal(job2.id, id);
+    t.equal(job2.retries, 1);
+    const info3 = await job2.info();
+    t.equal(info3.attempts, 2);
+    t.equal(info3.state, 'active');
+    await job2.perform();
+    const info4 = await job2.info();
+    t.equal(info4.attempts, 1);
+    t.equal(info4.state, 'inactive');
+
+    await minion.backend.pg.query`UPDATE minion_jobs SET delayed = NOW() WHERE id = ${id}`;
+    const job3 = await worker.dequeue(0);
+    t.equal(job3.id, id);
+    t.equal(job3.retries, 2);
+    const info5 = await job3.info();
+    t.equal(info5.attempts, 1);
+    t.equal(info5.state, 'active');
+    await job3.perform();
+    const info6 = await job3.info();
+    t.equal(info6.attempts, 1);
+    t.equal(info6.state, 'failed');
+    t.match(info6.result, {message: /Intentional failure/});
+
+    t.ok(await job3.retry({attempts: 2}));
+    const job4 = await worker.dequeue(0);
+    t.equal(job4.id, id);
+    await job4.perform();
+    t.equal((await job4.info()).state, 'inactive');
+    await minion.backend.pg.query`UPDATE minion_jobs SET delayed = NOW() WHERE id = ${id}`;
+    const job5 = await worker.dequeue(0);
+    t.equal(job5.id, id);
+    await job5.perform();
+    t.equal((await job5.info()).state, 'failed');
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
