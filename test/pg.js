@@ -848,6 +848,26 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Nested data structures', async t => {
+    minion.addTask('nested', async (job, object, array) => {
+      await job.note({bar: {baz: [1, 2, 3]}});
+      await job.note({baz: 'yada'});
+      await job.finish([{23: object.first[0].second + array[0][0]}]);
+    });
+    await minion.enqueue('nested', [{first: [{second: 'test'}]}, [[3]]], {notes: {foo: [4, 5, 6]}});
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    await job.perform();
+    t.equal((await job.info()).state, 'finished');
+    t.ok(await job.note({yada: ['works']}));
+    t.notOk(await minion.backend.note(-1, {yada: ['failed']}));
+    t.same((await job.info()).notes, {foo: [4, 5, 6], bar: {baz: [1, 2, 3]}, baz: 'yada', yada: ['works']});
+    t.same((await job.info()).result, [{23: 'test3'}]);
+    t.ok(await job.note({yada: null, bar: null}));
+    t.same((await job.info()).notes, {foo: [4, 5, 6], baz: 'yada'});
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
