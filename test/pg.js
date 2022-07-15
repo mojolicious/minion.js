@@ -60,8 +60,8 @@ t.test('PostgreSQL backend', skip, async t => {
     const promise = minion.result(id, {interval: 0});
     const job = await worker.dequeue(0);
     t.equal(job.id, id);
-    t.same(await job.finish({just: 'works'}), true);
     t.same(await job.note({foo: 'bar'}), true);
+    t.same(await job.finish({just: 'works'}), true);
     const info = await promise;
     t.same(info.result, {just: 'works'});
     t.same(info.notes, {foo: 'bar'});
