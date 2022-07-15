@@ -844,7 +844,7 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal(job3.id, id3);
     await job3.perform();
     t.equal((await job3.info()).state, 'failed');
-    t.match((await job3.info()).result, {message: /Intentional failure/});
+    t.match((await job3.info()).result, {name: 'Error', message: /Intentional failure/, stack: /Intentional failure/});
     await worker.unregister();
   });
 
