@@ -764,6 +764,40 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Delayed jobs', async t => {
+    const id = await minion.enqueue('add', [2, 1], {delay: 100});
+    t.equal((await minion.stats()).delayed_jobs, 1);
+    const worker = await minion.worker().register();
+    t.notOk(await worker.dequeue(0));
+    const job = await minion.job(id);
+    const info = await job.info();
+    t.ok(info.delayed > info.created);
+    await minion.backend.pg.query`UPDATE minion_jobs SET delayed = NOW() - INTERVAL '1 day' WHERE id = ${id}`;
+    const job2 = await worker.dequeue(0);
+    t.equal(job2.id, id);
+    t.same((await job2.info()).delayed instanceof Date, true);
+    t.ok(await job2.finish());
+    t.ok(await job2.retry());
+    const job3 = await minion.job(id);
+    const info2 = await job3.info();
+    t.ok(info2.delayed <= info2.retried);
+    t.ok(await job3.remove());
+    t.notOk(await job3.retry());
+
+    const id2 = await minion.enqueue('add', [6, 9]);
+    const job4 = await worker.dequeue(0);
+    t.equal(job4.id, id2);
+    const info3 = await job4.info();
+    t.ok(info3.delayed <= info3.created);
+    t.ok(await job4.fail());
+    t.ok(await job4.retry({delay: 100}));
+    const info4 = await job4.info();
+    t.equal(info4.retries, 1);
+    t.ok(info4.delayed > info4.retried);
+    t.ok(await minion.job(id2).then(job => job.remove()));
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
