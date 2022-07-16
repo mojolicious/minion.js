@@ -80,8 +80,17 @@ interface UpdateResult {
  * Minion PostgreSQL backend class.
  */
 export class PgBackend {
+  /**
+   * Backend name.
+   */
   name = 'Pg (Node.js)';
+  /**
+   * Minion instance this backend belongs to.
+   */
   minion: Minion;
+  /**
+   * `@mojojs/pg` object used to store all data.
+   */
   pg: Pg;
 
   _hostname = os.hostname();
@@ -91,6 +100,9 @@ export class PgBackend {
     this.pg = new Pg(config);
   }
 
+  /**
+   * Broadcast remote control command to one or more workers.
+   */
   async broadcast(command: string, args: any[] = [], ids: MinionWorkerId[] = []): Promise<boolean> {
     const results = await this.pg.rawQuery(
       `
@@ -103,6 +115,10 @@ export class PgBackend {
     return (results.count ?? 0) > 0;
   }
 
+  /**
+   * Wait a given amount of time in seconds for a job, dequeue it and transition from `inactive` to `active` state,
+   * or return `null` if queues were empty.
+   */
   async dequeue(id: MinionWorkerId, wait: number, options: DequeueOptions): Promise<DequeuedJob | null> {
     const job = await this._try(id, options);
     if (job !== null) return job;
@@ -123,10 +139,16 @@ export class PgBackend {
     return await this._try(id, options);
   }
 
+  /**
+   * Stop using the queue.
+   */
   async end(): Promise<void> {
     await this.pg.end();
   }
 
+  /**
+   * Enqueue a new job with `inactive` state.
+   */
   async enqueue(task: string, args: MinionArgs = [], options: EnqueueOptions = {}): Promise<MinionJobId> {
     const results = await this.pg.rawQuery<EnqueueResult>(
       `
@@ -152,14 +174,24 @@ export class PgBackend {
     return results.first.id;
   }
 
+  /**
+   * Transition from `active` to `failed` state with or without a result, and if there are attempts remaining,
+   * transition back to `inactive` with a delay.
+   */
   async failJob(id: MinionJobId, retries: number, result?: any): Promise<boolean> {
     return await this._update('failed', id, retries, result);
   }
 
+  /**
+   * Transition from C<active> to `finished` state with or without a result.
+   */
   async finishJob(id: MinionJobId, retries: number, result?: any): Promise<boolean> {
     return await this._update('finished', id, retries, result);
   }
 
+  /**
+   * Get history information for job queue.
+   */
   async history(): Promise<MinionHistory> {
     const results = await this.pg.query<DailyHistory>`
       SELECT EXTRACT(EPOCH FROM ts) AS epoch, COALESCE(failed_jobs, 0) AS failed_jobs,
@@ -180,6 +212,9 @@ export class PgBackend {
     return {daily: results};
   }
 
+  /**
+   * Returns the information about jobs in batches.
+   */
   async listJobs(offset: number, limit: number, options: ListJobsOptions = {}): Promise<JobList> {
     const results = await this.pg.rawQuery<ListJobsResult>(
       `
@@ -206,6 +241,9 @@ export class PgBackend {
     return {total: removeTotal(results), jobs: results};
   }
 
+  /**
+   * Returns information about locks in batches.
+   */
   async listLocks(offset: number, limit: number, options: ListLocksOptions = {}): Promise<LockList> {
     const results = await this.pg.rawQuery<ListLockResult>(
       `
@@ -221,6 +259,9 @@ export class PgBackend {
     return {total: removeTotal(results), locks: results};
   }
 
+  /**
+   * Returns information about workers in batches.
+   */
   async listWorkers(offset: number, limit: number, options: ListWorkersOptions = {}): Promise<WorkerList> {
     const results = await this.pg.rawQuery<ListWorkersResult>(
       `
@@ -240,18 +281,28 @@ export class PgBackend {
     return {total: removeTotal(results), workers: results};
   }
 
+  /**
+   * Try to acquire a named lock that will expire automatically after the given amount of time in seconds. An
+   * expiration time of `0` can be used to check if a named lock already exists without creating one.
+   */
   async lock(name: string, duration: number, options: LockOptions = {}): Promise<boolean> {
     const limit = options.limit ?? 1;
     const results = await this.pg.query<LockResult>`SELECT * FROM minion_lock(${name}, ${duration}, ${limit})`;
     return results.first.minion_lock;
   }
 
+  /**
+   * Change one or more metadata fields for a job. Setting a value to `null` will remove the field.
+   */
   async note(id: MinionJobId, merge: Record<string, any>): Promise<boolean> {
     const results = await this.pg
       .query`UPDATE minion_jobs SET notes = JSONB_STRIP_NULLS(notes || ${merge}) WHERE id = ${id}`;
     return (results.count ?? 0) > 0;
   }
 
+  /**
+   * Receive remote control commands for worker.
+   */
   async receive(id: MinionWorkerId): Promise<Array<[string, ...any[]]>> {
     const results = await this.pg.query<ReceiveResult>`
       UPDATE minion_workers AS new SET inbox = '[]'
@@ -262,6 +313,9 @@ export class PgBackend {
     return results.first?.inbox ?? [];
   }
 
+  /**
+   * Register worker or send heartbeat to show that this worker is still alive.
+   */
   async registerWorker(id?: MinionWorkerId, options: RegisterWorkerOptions = {}): Promise<MinionWorkerId> {
     const status = options.status ?? {};
     const results = await this.pg.query<RegisterWorkerResult>`
@@ -273,12 +327,18 @@ export class PgBackend {
     return results.first.id;
   }
 
+  /**
+   * Remove `failed`, `finished` or `inactive` job from queue.
+   */
   async removeJob(id: MinionJobId): Promise<boolean> {
     const results = await this.pg
       .query`DELETE FROM minion_jobs WHERE id = ${id} AND state IN ('inactive', 'failed', 'finished')`;
     return (results.count ?? 0) > 0 ? true : false;
   }
 
+  /**
+   * Repair worker registry and job queue if necessary.
+   */
   async repair(): Promise<void> {
     const pg = this.pg;
     const minion = this.minion;
@@ -315,11 +375,17 @@ export class PgBackend {
     `;
   }
 
+  /**
+   * Reset job queue.
+   */
   async reset(options: ResetOptions): Promise<void> {
     if (options.all === true) await this.pg.query`TRUNCATE minion_jobs, minion_locks, minion_workers RESTART IDENTITY`;
     if (options.locks === true) await this.pg.query`TRUNCATE minion_locks`;
   }
 
+  /**
+   * Transition job back to `inactive` state, already `inactive` jobs may also be retried to change options.
+   */
   async retryJob(id: MinionJobId, retries: number, options: RetryOptions = {}): Promise<boolean> {
     const results = await this.pg.rawQuery(
       `
@@ -343,6 +409,9 @@ export class PgBackend {
     return (results.count ?? 0) > 0 ? true : false;
   }
 
+  /**
+   * Get statistics for the job queue.
+   */
   async stats(): Promise<MinionStats> {
     const results = await this.pg.query<MinionStats>`
       SELECT COUNT(*) FILTER (WHERE state = 'inactive' AND (expires IS NULL OR expires > NOW())) AS inactive_jobs,
@@ -363,6 +432,9 @@ export class PgBackend {
     return stats;
   }
 
+  /**
+   * Release a named lock.
+   */
   async unlock(name: string): Promise<boolean> {
     const results = await this.pg.query`
       DELETE FROM minion_locks WHERE id = (
@@ -372,10 +444,16 @@ export class PgBackend {
     return (results.count ?? 0) > 0 ? true : false;
   }
 
+  /**
+   * Unregister worker.
+   */
   async unregisterWorker(id: MinionWorkerId): Promise<void> {
     await this.pg.query`DELETE FROM minion_workers WHERE id = ${id}`;
   }
 
+  /**
+   * Update database schema to latest version.
+   */
   async update(): Promise<void> {
     const pg = this.pg;
 
