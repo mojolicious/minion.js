@@ -1176,6 +1176,39 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('performJobs', async t => {
+    minion.addTask('record_pid', async job => {
+      await job.finish({pid: process.pid});
+    });
+    minion.addTask('perform_fails', async () => {
+      throw new Error('Just a test');
+    });
+
+    const id = await minion.enqueue('record_pid');
+    const id2 = await minion.enqueue('perform_fails');
+    const id3 = await minion.enqueue('record_pid');
+    await minion.performJobs();
+    const job = await minion.job(id);
+    t.equal(job.task, 'record_pid');
+    t.equal((await job.info()).state, 'finished');
+    t.same((await job.info()).result, {pid: process.pid});
+    const job2 = await minion.job(id2);
+    t.equal(job2.task, 'perform_fails');
+    t.equal((await job2.info()).state, 'failed');
+    t.match((await job2.info()).result, {message: /Just a test/});
+    const job3 = await minion.job(id3);
+    t.equal(job3.task, 'record_pid');
+    t.equal((await job3.info()).state, 'finished');
+    t.same((await job3.info()).result, {pid: process.pid});
+
+    const id4 = await minion.enqueue('record_pid');
+    await minion.performJobs();
+    const job4 = await minion.job(id4);
+    t.equal(job4.task, 'record_pid');
+    t.equal((await job4.info()).state, 'finished');
+    t.same((await job4.info()).result, {pid: process.pid});
+  });
+
   await t.test('Foreground', async t => {
     const id = await minion.enqueue('test', [], {attempts: 2});
     const id2 = await minion.enqueue('test');

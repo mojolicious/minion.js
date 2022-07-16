@@ -1,5 +1,6 @@
 import type {
   EnqueueOptions,
+  DequeueOptions,
   JobInfo,
   ListJobsOptions,
   ListWorkersOptions,
@@ -112,6 +113,18 @@ export default class Minion {
 
   async lock(name: string, duration: number, options: LockOptions): Promise<boolean> {
     return await this.backend.lock(name, duration, options);
+  }
+
+  async performJobs(options?: DequeueOptions): Promise<void> {
+    const worker = await this.worker().register();
+    try {
+      let job;
+      while ((job = await worker.register().then(worker => worker.dequeue(0, options)))) {
+        await job.perform();
+      }
+    } finally {
+      await worker.unregister();
+    }
   }
 
   async repair(): Promise<void> {
