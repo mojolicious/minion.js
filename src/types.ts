@@ -1,4 +1,5 @@
 import type {Job} from './job.js';
+import type {Worker} from './worker.js';
 
 export interface MinionBackend {
   broadcast: (command: string, args?: any[], ids?: MinionJobId[]) => Promise<boolean>;
@@ -30,6 +31,7 @@ export type MinionStates = 'inactive' | 'active' | 'failed' | 'finished';
 export type MinionJobId = number;
 export type MinionWorkerId = number;
 export type MinionTask = (job: Job, ...args: MinionArgs) => Promise<void>;
+export type MinionCommand = (worker: Worker, ...args: any[]) => Promise<void>;
 
 export interface MinionHistory {
   daily: DailyHistory[];
@@ -108,6 +110,7 @@ export interface RetryOptions {
 }
 
 export interface WorkerOptions {
+  commands?: Record<string, MinionCommand>;
   status?: Record<string, any>;
 }
 

@@ -96,7 +96,7 @@ export class PgBackend {
         UPDATE minion_workers SET inbox = inbox || $1::JSONB
         WHERE (id = ANY ($2) OR $2 = '{}')
       `,
-      [command, ...args],
+      JSON.stringify([[command, ...args]]),
       ids
     );
     return (results.count ?? 0) > 0;

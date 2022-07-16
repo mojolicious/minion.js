@@ -59,6 +59,10 @@ export default class Minion {
     return retries ** 4 + 15;
   }
 
+  async broadcast(command: string, args?: any[], ids?: number[]): Promise<boolean> {
+    return await this.backend.broadcast(command, args, ids);
+  }
+
   async end(): Promise<void> {
     await this.backend.end();
   }

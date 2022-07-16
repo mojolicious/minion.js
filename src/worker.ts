@@ -1,11 +1,12 @@
 import type Minion from './minion.js';
-import type {DequeueOptions, WorkerInfo, WorkerOptions} from './types.js';
+import type {DequeueOptions, MinionCommand, WorkerInfo, WorkerOptions} from './types.js';
 import {Job} from './job.js';
 
 /**
  * Minion worker class.
  */
 export class Worker {
+  commands: Record<string, MinionCommand>;
   status: Record<string, any>;
 
   _id: number | undefined = undefined;
@@ -13,7 +14,12 @@ export class Worker {
 
   constructor(minion: Minion, options: WorkerOptions = {}) {
     this._minion = minion;
+    this.commands = options.commands ?? {};
     this.status = options.status ?? {};
+  }
+
+  addCommand(name: string, fn: MinionCommand): void {
+    this.commands[name] = fn;
   }
 
   async dequeue(wait: number, options: DequeueOptions = {}): Promise<Job | null> {
@@ -37,6 +43,17 @@ export class Worker {
 
   get minion(): Minion {
     return this._minion;
+  }
+
+  async processCommands(): Promise<void> {
+    const id = this._id;
+    if (id === undefined) return;
+
+    const commands = await this.minion.backend.receive(id);
+    for (const [command, ...args] of commands) {
+      const fn = this.commands[command];
+      if (fn !== undefined) await fn(this, ...args);
+    }
   }
 
   async register(): Promise<this> {
