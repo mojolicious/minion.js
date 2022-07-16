@@ -37,6 +37,21 @@ export class Job {
     return await this.minion.backend.note(this.id, merge);
   }
 
+  async parents(): Promise<Job[]> {
+    const results: Job[] = [];
+
+    const info = await this.info();
+    if (info === null) return results;
+
+    const minion = this.minion;
+    for (const parent of info.parents) {
+      const job = await minion.job(parent);
+      if (job !== null) results.push(job);
+    }
+
+    return results;
+  }
+
   async perform(): Promise<void> {
     try {
       const task = this.minion.tasks[this.task];

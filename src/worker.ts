@@ -22,7 +22,7 @@ export class Worker {
     this.commands[name] = fn;
   }
 
-  async dequeue(wait: number, options: DequeueOptions = {}): Promise<Job | null> {
+  async dequeue(wait = 0, options: DequeueOptions = {}): Promise<Job | null> {
     const id = this._id;
     if (id === undefined) return null;
 
