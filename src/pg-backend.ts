@@ -24,7 +24,7 @@ import type {
   WorkerList
 } from './types.js';
 import type {PgConfig} from '@mojojs/pg';
-import os from 'os';
+import os from 'node:os';
 import Path from '@mojojs/path';
 import Pg from '@mojojs/pg';
 

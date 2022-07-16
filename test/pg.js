@@ -1,4 +1,4 @@
-import os from 'os';
+import os from 'node:os';
 import Minion from '../lib/minion.js';
 import mojo, {util} from '@mojojs/core';
 import Pg from '@mojojs/pg';
