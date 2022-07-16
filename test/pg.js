@@ -954,6 +954,29 @@ t.test('PostgreSQL backend', skip, async t => {
     t.match((await job2.info()).result, 'Worker went away');
   });
 
+  await t.test('A job needs to be dequeued again after a retry', async t => {
+    minion.addTask('restart', async () => {
+      return;
+    });
+    const id = await minion.enqueue('restart');
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id);
+    t.ok(await job.finish());
+    t.equal((await job.info()).state, 'finished');
+    t.ok(await job.retry());
+    t.equal((await job.info()).state, 'inactive');
+    const job2 = await worker.dequeue(0);
+    t.equal((await job2.info()).state, 'active');
+    t.notOk(await job.finish());
+    t.equal((await job2.info()).state, 'active');
+    t.equal(job2.id, id);
+    t.ok(await job2.finish());
+    t.notOk(await job.retry());
+    t.equal((await job2.info()).state, 'finished');
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
