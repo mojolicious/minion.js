@@ -1282,6 +1282,8 @@ t.test('PostgreSQL backend', skip, async t => {
     t.notOk(await minion.broadcast('test_id', []));
   });
 
+  await minion.end();
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
