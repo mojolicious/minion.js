@@ -1176,6 +1176,51 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Foreground', async t => {
+    const id = await minion.enqueue('test', [], {attempts: 2});
+    const id2 = await minion.enqueue('test');
+    const id3 = await minion.enqueue('test', [], {parents: [id, id2]});
+    t.notOk(await minion.foreground(id3 + 1));
+    t.notOk(await minion.foreground(id3));
+    const info = await minion.job(id).then(job => job.info());
+    t.equal(info.attempts, 2);
+    t.equal(info.state, 'inactive');
+    t.equal(info.queue, 'default');
+    t.ok(await minion.foreground(id));
+    const info2 = await minion.job(id).then(job => job.info());
+    t.equal(info2.attempts, 1);
+    t.equal(info2.retries, 1);
+    t.equal(info2.state, 'finished');
+    t.equal(info2.queue, 'minion_foreground');
+    t.ok(await minion.foreground(id2));
+    const info3 = await minion.job(id2).then(job => job.info());
+    t.equal(info3.retries, 1);
+    t.equal(info3.state, 'finished');
+    t.equal(info3.queue, 'minion_foreground');
+
+    t.ok(await minion.foreground(id3));
+    const info4 = await minion.job(id3).then(job => job.info());
+    t.equal(info4.retries, 2);
+    t.equal(info4.state, 'finished');
+    t.equal(info4.queue, 'minion_foreground');
+
+    const id4 = await minion.enqueue('fail');
+    let result;
+    try {
+      await minion.foreground(id4);
+    } catch (error) {
+      result = error;
+    }
+    t.match(result, {message: /Intentional failure/});
+    const info5 = await minion.job(id4).then(job => job.info());
+    t.ok(info5.worker);
+    t.equal((await minion.stats()).workers, 0);
+    t.equal(info5.retries, 1);
+    t.equal(info5.state, 'failed');
+    t.equal(info5.queue, 'minion_foreground');
+    t.match(info5.result, {message: /Intentional failure/});
+  });
+
   await t.test('Worker remote control commands', async t => {
     const worker = await minion.worker().register();
     await worker.processCommands();

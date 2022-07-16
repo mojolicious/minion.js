@@ -20,7 +20,18 @@ export class Job {
     this.task = task;
   }
 
+  async execute(): Promise<any | null> {
+    try {
+      const task = this.minion.tasks[this.task];
+      await task(this, ...this.args);
+      return null;
+    } catch (error: any) {
+      return error;
+    }
+  }
+
   async fail(result: any = 'Unknown error'): Promise<boolean> {
+    if (result instanceof Error) result = {name: result.name, message: result.message, stack: result.stack};
     return await this.minion.backend.failJob(this.id, this.retries, result);
   }
 
@@ -53,12 +64,11 @@ export class Job {
   }
 
   async perform(): Promise<void> {
-    try {
-      const task = this.minion.tasks[this.task];
-      await task(this, ...this.args);
+    const error = await this.execute();
+    if (error === null) {
       await this.finish();
-    } catch (error) {
-      await this.fail(error instanceof Error ? {name: error.name, message: error.message, stack: error.stack} : error);
+    } else {
+      await this.fail(error);
     }
   }
 

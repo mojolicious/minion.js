@@ -71,6 +71,28 @@ export default class Minion {
     return await this.backend.enqueue(task, args, options);
   }
 
+  async foreground(id: number): Promise<boolean> {
+    const job = await this.job(id);
+    if (job === null) return false;
+    if ((await job.retry({attempts: 1, queue: 'minion_foreground'})) !== true) return false;
+
+    const worker = await this.worker().register();
+    try {
+      const job = await worker.dequeue(0, {id, queues: ['minion_foreground']});
+      if (job === null) return false;
+      const error = await job.execute();
+      if (error === null) {
+        await job.finish();
+        return true;
+      } else {
+        await job.fail(error);
+        throw error;
+      }
+    } finally {
+      await worker.unregister();
+    }
+  }
+
   async history(): Promise<MinionHistory> {
     return await this.backend.history();
   }
