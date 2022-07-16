@@ -13,6 +13,7 @@ export interface MinionBackend {
   listLocks: (offset: number, limit: number, options?: ListLocksOptions) => Promise<LockList>;
   listWorkers: (offset: number, limit: number, options?: ListWorkersOptions) => Promise<WorkerList>;
   lock: (name: string, duration: number, options?: LockOptions) => Promise<boolean>;
+  name: string;
   note: (id: MinionJobId, merge: Record<string, any>) => Promise<boolean>;
   receive: (id: MinionWorkerId) => Promise<Array<[string, ...any[]]>>;
   registerWorker: (id?: MinionWorkerId, options?: RegisterWorkerOptions) => Promise<number>;
