@@ -977,6 +977,24 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Perform jobs concurrently', async t => {
+    const id = await minion.enqueue('add', [10, 11]);
+    const id2 = await minion.enqueue('add', [12, 13]);
+    const id3 = await minion.enqueue('test');
+    const id4 = await minion.enqueue('fail');
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    const job2 = await worker.dequeue(0);
+    const job3 = await worker.dequeue(0);
+    const job4 = await worker.dequeue(0);
+    await Promise.all([job.perform(), job2.perform(), job3.perform(), job4.perform()]);
+    t.equal((await minion.job(id).then(job => job.info())).state, 'finished');
+    t.equal((await minion.job(id2).then(job => job.info())).state, 'finished');
+    t.equal((await minion.job(id3).then(job => job.info())).state, 'finished');
+    t.equal((await minion.job(id4).then(job => job.info())).state, 'failed');
+    await worker.unregister();
+  });
+
   // Clean up once we are done
   await pg.query`DROP SCHEMA minion_backend_test CASCADE`;
 
