@@ -1062,6 +1062,55 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Job dependencies (lax)', async t => {
+    const worker = await minion.worker().register();
+    const id = await minion.enqueue('test');
+    const id2 = await minion.enqueue('test');
+    const id3 = await minion.enqueue('test', [], {lax: true, parents: [id, id2]});
+    const job = await worker.dequeue();
+    t.equal(job.id, id);
+    t.same((await job.info()).children, [id3]);
+    t.same((await job.info()).parents, []);
+    const job2 = await worker.dequeue();
+    t.equal(job2.id, id2);
+    t.same((await job2.info()).children, [id3]);
+    t.same((await job2.info()).parents, []);
+    t.notOk(await worker.dequeue());
+    t.ok(await job.finish());
+    t.notOk(await worker.dequeue());
+    t.ok(await job2.fail());
+    const job3 = await worker.dequeue();
+    t.equal(job3.id, id3);
+    t.same((await job3.info()).children, []);
+    t.same((await job3.info()).parents, [id, id2]);
+    t.ok(await job3.finish());
+
+    const id4 = await minion.enqueue('test');
+    const id5 = await minion.enqueue('test', [], {parents: [id4]});
+    const job4 = await worker.dequeue();
+    t.equal(job4.id, id4);
+    t.notOk(await worker.dequeue());
+    t.ok(await job4.fail());
+    t.notOk(await worker.dequeue());
+    t.ok(await minion.job(id5).then(job => job.retry({lax: true})));
+    const job5 = await worker.dequeue();
+    t.equal(job5.id, id5);
+    t.same((await job5.info()).children, []);
+    t.same((await job5.info()).parents, [id4]);
+    t.ok(await job5.finish());
+    t.ok(await job4.remove());
+
+    t.same((await minion.jobs({ids: [id5]}).next()).lax, true);
+    t.ok(await minion.job(id5).then(job => job.retry()));
+    t.same((await minion.jobs({ids: [id5]}).next()).lax, true);
+    t.ok(await minion.job(id5).then(job => job.retry({lax: false})));
+    t.same((await minion.jobs({ids: [id5]}).next()).lax, false);
+    t.ok(await minion.job(id5).then(job => job.retry()));
+    t.same((await minion.jobs({ids: [id5]}).next()).lax, false);
+    t.ok(await minion.job(id5).then(job => job.remove()));
+    await worker.unregister();
+  });
+
   await t.test('Expiring jobs', async t => {
     const id = await minion.enqueue('test');
     t.notOk((await minion.job(id).then(job => job.info())).expires);
