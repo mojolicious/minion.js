@@ -996,6 +996,71 @@ t.test('PostgreSQL backend', skip, async t => {
     await worker.unregister();
   });
 
+  await t.test('Expiring jobs', async t => {
+    const id = await minion.enqueue('test');
+    t.notOk((await minion.job(id).then(job => job.info())).expires);
+    t.ok(await minion.job(id).then(job => job.remove()));
+
+    const id2 = await minion.enqueue('test', [], {expire: 300});
+    t.same((await minion.job(id2).then(job => job.info())).expires instanceof Date, true);
+    const worker = await minion.worker().register();
+    const job = await worker.dequeue(0);
+    t.equal(job.id, id2);
+    const expires = (await job.info()).expires;
+    t.same(expires instanceof Date, true);
+    t.ok(await job.finish());
+    t.ok(await job.retry({expire: 600}));
+    const info = await minion.job(id2).then(job => job.info());
+    t.equal(info.state, 'inactive');
+    t.same(info.expires instanceof Date, true);
+    t.not(info.expires.getTime(), expires.getTime());
+    await minion.repair();
+    t.equal(await minion.jobs({states: ['inactive']}).total(), 1);
+    const job2 = await worker.dequeue(0);
+    t.equal(job2.id, id2);
+    t.ok(await job2.finish());
+
+    const id3 = await minion.enqueue('test', [], {expire: 300});
+    t.equal(await minion.jobs({states: ['inactive']}).total(), 1);
+    await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id3}`;
+    await minion.repair();
+    t.notOk(await worker.dequeue(0));
+    t.equal(await minion.jobs({states: ['inactive']}).total(), 0);
+
+    const id4 = await minion.enqueue('test', [], {expire: 300});
+    const job4 = await worker.dequeue(0);
+    t.equal(job4.id, id4);
+    t.ok(await job4.finish());
+    await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id4}`;
+    await minion.repair();
+    t.equal((await job4.info()).state, 'finished');
+
+    const id5 = await minion.enqueue('test', [], {expire: 300});
+    const job5 = await worker.dequeue(0);
+    t.equal(job5.id, id5);
+    t.ok(await job5.fail());
+    await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id5}`;
+    await minion.repair();
+    t.equal((await job5.info()).state, 'failed');
+
+    const id6 = await minion.enqueue('test', [], {expire: 300});
+    const job6 = await worker.dequeue(0);
+    t.equal(job6.id, id6);
+    await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id6}`;
+    await minion.repair();
+    t.equal((await job6.info()).state, 'active');
+    t.ok(await job6.finish());
+
+    const id7 = await minion.enqueue('test', [], {expire: 300});
+    const id8 = await minion.enqueue('test', [], {expire: 300, parents: [id7]});
+    t.notOk(await worker.dequeue(0, {id: id8}));
+    await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id7}`;
+    await minion.repair();
+    const job8 = await worker.dequeue(0, {id: id8});
+    t.ok(await job8.finish());
+    await worker.unregister();
+  });
+
   await t.test('Worker remote control commands', async t => {
     const worker = await minion.worker().register();
     await worker.processCommands();
