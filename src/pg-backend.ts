@@ -80,6 +80,7 @@ interface UpdateResult {
  * Minion PostgreSQL backend class.
  */
 export class PgBackend {
+  name = 'Pg (Node.js)';
   minion: Minion;
   pg: Pg;
 

@@ -27,6 +27,7 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal(await minion.backend.pg.migrations.active(), 0);
     await minion.backend.pg.migrations.migrate();
     t.equal(await minion.backend.pg.migrations.active(), 23);
+    t.equal(minion.backend.name, 'Pg (Node.js)');
   });
 
   await t.test('Register and unregister', async t => {
