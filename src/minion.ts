@@ -296,7 +296,7 @@ class BackendIterator<T> {
   /**
    * List options.
    */
-  options: ListWorkersOptions | ListJobsOptions;
+  options: ListWorkersOptions & ListJobsOptions;
 
   _cache: T[] = [];
   _count = 0;
@@ -304,7 +304,7 @@ class BackendIterator<T> {
   _name: string;
   _total = 0;
 
-  constructor(minion: Minion, name: string, options: ListWorkersOptions | ListJobsOptions) {
+  constructor(minion: Minion, name: string, options: ListWorkersOptions & ListJobsOptions) {
     this.options = options;
 
     this._minion = minion;
