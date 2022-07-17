@@ -22,6 +22,8 @@ import {Worker} from './worker.js';
 import mojo from '@mojojs/core';
 import {AbortError} from '@mojojs/util';
 
+export {minionPlugin} from './mojo-minion.js';
+
 export interface MinionOptions {
   backendClass?: any;
   missingAfter?: number;
@@ -67,8 +69,9 @@ export default class Minion {
    */
   tasks: Record<string, MinionTask> = {};
 
-  constructor(config: any, options: MinionOptions = {backendClass: PgBackend}) {
-    this.backend = new options.backendClass(this, config);
+  constructor(config: any, options: MinionOptions = {}) {
+    const backendClass = options.backendClass ?? PgBackend;
+    this.backend = new backendClass(this, config);
     if (options.missingAfter !== undefined) this.missingAfter = options.missingAfter;
     if (options.removeAfter !== undefined) this.removeAfter = options.removeAfter;
     if (options.stuckAfter !== undefined) this.stuckAfter = options.stuckAfter;
