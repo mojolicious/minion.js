@@ -7,9 +7,41 @@
 
 A high performance job queue for Node.js. Written in TypeScript. ***WORK IN PROGRESS***
 
+Minion.js comes with support for multiple named queues, priorities, high priority fast lane, delayed jobs,
+job dependencies, job progress, job results, retries with backoff, rate limiting, unique jobs, expiring jobs,
+statistics, distributed workers, parallel processing, remote control, [mojo.js](https://mojojs.org) admin ui and
+multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
+
+Job queues allow you to process time and/or computationally intensive tasks in background processes, outside of the
+request/response lifecycle of web applications. Among those tasks you'll commonly find image resizing, spam filtering,
+HTTP downloads, building tarballs, warming caches and basically everything else you can imagine that's not super fast.
+
 ```js
 import Minion from '@minionjs/core';
 
+// Use the default high performance PostgreSQL backend
+const minion = new Minion('postgres://user:password@localhost:5432/database');
+
+// Update the database schema to the latest version
+await minion.update();
+
+// Add tasks
+minion.addTask('somethingSlow', async (job, ...args) => {
+  console.log('This is a background worker process.');
+});
+
+// Enqueue jobs
+await minion.enqueue('somethingSlow', ['foo', 'bar']);
+await minion.enqueue('somethingSlow', [1, 2, 3], {priority: 5});
+
+// Perform jobs for testing
+await minion.enqueue('somethingSlow', ['foo', 'bar']);
+await minion.performJobs();
+
+// Start a worker to perform up to 12 jobs concurrently
+const worker = minion.worker();
+worker.status.jobs = 12;
+await worker.start();
 ```
 
 ## Installation

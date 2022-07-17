@@ -91,6 +91,13 @@ export class Worker {
   }
 
   /**
+   * Start worker.
+   */
+  async start(): Promise<void> {
+    throw new Error('Not yet implemented');
+  }
+
+  /**
    * Unregister worker.
    */
   async unregister(): Promise<this> {
