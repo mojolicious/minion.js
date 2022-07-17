@@ -1,5 +1,5 @@
 import type Minion from './minion.js';
-import type {JobInfo, MinionArgs, MinionJobId, RetryOptions} from './types.js';
+import type {JobInfo, MinionArgs, MinionJob, MinionJobId, RetryOptions} from './types.js';
 import type {MojoApp} from '@mojojs/core';
 
 /**
@@ -89,8 +89,8 @@ export class Job {
   /**
    * Return all jobs this job depends on.
    */
-  async parents(): Promise<Job[]> {
-    const results: Job[] = [];
+  async parents(): Promise<MinionJob[]> {
+    const results: MinionJob[] = [];
 
     const info = await this.info();
     if (info === null) return results;

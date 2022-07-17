@@ -28,11 +28,13 @@ export interface MinionBackend {
 }
 
 export type MinionArgs = any[];
+export type MinionCommand = (worker: MinionWorker, ...args: any[]) => Promise<void>;
 export type MinionStates = 'inactive' | 'active' | 'failed' | 'finished';
+export type MinionJob = Job;
 export type MinionJobId = number;
 export type MinionWorkerId = number;
-export type MinionTask = (job: Job, ...args: MinionArgs) => Promise<void>;
-export type MinionCommand = (worker: Worker, ...args: any[]) => Promise<void>;
+export type MinionTask = (job: MinionJob, ...args: MinionArgs) => Promise<void>;
+export type MinionWorker = Worker;
 
 export interface MinionHistory {
   daily: DailyHistory[];

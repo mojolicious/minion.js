@@ -8,9 +8,11 @@ import type {
   MinionArgs,
   MinionBackend,
   MinionHistory,
+  MinionJob,
   MinionJobId,
   MinionStats,
   MinionTask,
+  MinionWorker,
   ResetOptions,
   WorkerInfo,
   WorkerOptions
@@ -23,6 +25,8 @@ import mojo from '@mojojs/core';
 import {AbortError} from '@mojojs/util';
 
 export {minionPlugin} from './mojo/plugin.js';
+
+export type {MinionJob, MinionWorker};
 
 export interface MinionOptions {
   backendClass?: any;
@@ -170,7 +174,7 @@ export default class Minion {
   /**
    * Get job object without making any changes to the actual job or return `null` if job does not exist.
    */
-  async job(id: MinionJobId): Promise<Job | null> {
+  async job(id: MinionJobId): Promise<MinionJob | null> {
     const info = (await this.backend.listJobs(0, 1, {ids: [id]})).jobs[0];
     return info === undefined ? null : new Job(this, info.id, info.args, info.retries, info.task);
   }
@@ -255,7 +259,7 @@ export default class Minion {
   /**
    * Build worker object. Note that this method should only be used to implement custom workers.
    */
-  worker(options?: WorkerOptions): Worker {
+  worker(options?: WorkerOptions): MinionWorker {
     return new Worker(this, options);
   }
 
