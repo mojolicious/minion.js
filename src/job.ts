@@ -1,5 +1,6 @@
 import type Minion from './minion.js';
 import type {JobInfo, MinionArgs, MinionJobId, RetryOptions} from './types.js';
+import type {MojoApp} from '@mojojs/core';
 
 /**
  * Minion job class.
@@ -30,6 +31,13 @@ export class Job {
     this.args = args;
     this.retries = retries;
     this.task = task;
+  }
+
+  /**
+   * `@mojojs/core` app this job queue belongs to.
+   */
+  get app(): MojoApp {
+    return this.minion.app;
   }
 
   /**
