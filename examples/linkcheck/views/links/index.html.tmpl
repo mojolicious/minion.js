@@ -4,4 +4,4 @@
   %= await ctx.inputTag('url', {type: 'url', value: 'https://mojolicious.org/perldoc'})
   %= ctx.submitButtonTag('Check')
 <{/formBlock}>
-%= ctx.formFor('check', {}, await formBlock());
+%= ctx.formFor('check', {class: 'check-form'}, await formBlock());
