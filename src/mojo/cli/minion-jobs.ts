@@ -16,7 +16,7 @@ export default async function jobsCommand(app: MojoApp, args: string[]): Promise
   await listJobs(minion, parsed.limit, parsed.offset, options);
 }
 
-async function listJobs(minion: Minion, limit = 0, offset = 0, options: ListJobsOptions = {}): Promise<void> {
+async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJobsOptions = {}): Promise<void> {
   const jobs = (await minion.backend.listJobs(offset, limit, options)).jobs;
   process.stdout.write(tablify(jobs.map(job => [job.id.toString(), job.state, job.queue, job.task])));
 }

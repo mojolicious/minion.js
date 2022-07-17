@@ -15,11 +15,40 @@ t.test('Command app', skip, async t => {
   const app = mojo();
   app.plugin(minionPlugin, {config: pg});
 
+  const minion = app.models.minion;
+
   await t.test('Help', async t => {
     const output = await captureOutput(async () => {
       await app.cli.start();
     });
     t.match(output.toString(), /minion-jobs.*minion-worker/s);
+  });
+
+  await t.test('minion-jobs', async t => {
+    await t.test('List jobs', async t => {
+      await minion.enqueue('test');
+      await minion.enqueue('test');
+      await minion.enqueue('test', [], {queue: 'important'});
+
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-jobs');
+      });
+      t.match(output.toString(), /3.+inactive.+important.+test.+2.+inactive.+default.+test.+inactive.+default.+test/s);
+
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-jobs', '-l', '1');
+      });
+      t.match(output2.toString(), /3.+inactive.+important.+test/s);
+      t.notMatch(output2.toString(), /2/s);
+      t.notMatch(output2.toString(), /1/s);
+
+      const output3 = await captureOutput(async () => {
+        await app.cli.start('minion-jobs', '-l', '1', '-o', '1');
+      });
+      t.match(output3.toString(), /2.+inactive.+default.+test/s);
+      t.notMatch(output3.toString(), /3/s);
+      t.notMatch(output3.toString(), /1/s);
+    });
   });
 
   // Clean up once we are done
