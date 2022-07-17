@@ -1,0 +1,20 @@
+% view.layout = 'linkcheck';
+% stash.title = 'Result';
+% if (result === null) {
+  % ctx.contentFor('header', '<meta http-equiv="refresh" content="3">');
+  <p>Waiting for result...</p>
+% }
+% else {
+  <table>
+    <tr>
+      <th>URL</th>
+      <th>Status</th>
+    </tr>
+    % for (const status of result) {
+      <tr>
+        <td><%= status[0] %></td>
+        <td><%= status[1] %></td>
+      </tr>
+    % }
+  </table>
+% }
