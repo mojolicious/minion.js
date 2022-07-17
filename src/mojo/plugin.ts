@@ -1,6 +1,6 @@
-import type {MinionOptions} from './minion.js';
+import type {MinionOptions} from '../minion.js';
 import type {MojoApp} from '@mojojs/core';
-import Minion from './minion.js';
+import Minion from '../minion.js';
 
 interface PluginOptions extends MinionOptions {
   autoUpdate?: boolean;

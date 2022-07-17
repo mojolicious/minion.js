@@ -22,7 +22,7 @@ import {Worker} from './worker.js';
 import mojo from '@mojojs/core';
 import {AbortError} from '@mojojs/util';
 
-export {minionPlugin} from './mojo-minion.js';
+export {minionPlugin} from './mojo/plugin.js';
 
 export interface MinionOptions {
   backendClass?: any;
