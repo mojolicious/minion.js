@@ -25,11 +25,11 @@ t.test('Command app', skip, async t => {
   });
 
   await t.test('minion-job', async t => {
-    await t.test('List jobs', async t => {
-      await minion.enqueue('test');
-      await minion.enqueue('test');
-      await minion.enqueue('test', [], {queue: 'important'});
+    await minion.enqueue('test');
+    await minion.enqueue('test');
+    await minion.enqueue('test', [], {queue: 'important'});
 
+    await t.test('List jobs', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job');
       });
