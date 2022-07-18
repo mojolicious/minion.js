@@ -2,18 +2,35 @@ import type Minion from '../../minion.js';
 import type {ListJobsOptions} from '../../types.js';
 import type {MojoApp} from '@mojojs/core';
 import {tablify} from '@mojojs/util';
+import yaml from 'js-yaml';
 import nopt from 'nopt';
 
 /**
- * Minion jobs command.
+ * Minion job command.
  */
-export default async function jobsCommand(app: MojoApp, args: string[]): Promise<void> {
+export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
   const parsed = nopt({limit: Number, offset: Number}, {l: '--limit', o: '--offset'}, args, 1);
 
   const options = {};
   const minion = app.models.minion;
+  const id = parseInt(parsed.argv.remain[0]);
 
-  await listJobs(minion, parsed.limit, parsed.offset, options);
+  const stdout = process.stdout;
+
+  // Job info
+  if (isNaN(id) === false) {
+    const job = await minion.job(id);
+    if (job === null) {
+      stdout.write('Job does not exist.\n');
+    } else {
+      stdout.write(yaml.dump(await job.info()));
+    }
+  }
+
+  // List jobs
+  else {
+    await listJobs(minion, parsed.limit, parsed.offset, options);
+  }
 }
 
 async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJobsOptions = {}): Promise<void> {
@@ -21,10 +38,11 @@ async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJob
   process.stdout.write(tablify(jobs.map(job => [job.id.toString(), job.state, job.queue, job.task])));
 }
 
-jobsCommand.description = 'Manage Minion jobs';
-jobsCommand.usage = `Usage: APPLICATION minion-jobs [OPTIONS]
+jobCommand.description = 'Manage Minion job';
+jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
 
-  node index.js minion-jobs
+  node index.js minion-job
+  node index.js minion-job 10023
 
 Options:
   -h, --help              Show this summary of available options
