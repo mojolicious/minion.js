@@ -9,7 +9,12 @@ import nopt from 'nopt';
  * Minion job command.
  */
 export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
-  const parsed = nopt({limit: Number, offset: Number}, {l: '--limit', o: '--offset'}, args, 1);
+  const parsed = nopt(
+    {enqueue: String, limit: Number, offset: Number},
+    {e: '--enqueue', l: '--limit', o: '--offset'},
+    args,
+    1
+  );
 
   const options = {};
   const minion = app.models.minion;
@@ -17,8 +22,14 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
 
   const stdout = process.stdout;
 
+  // Enqueue
+  if (parsed.enqueue !== undefined) {
+    const id = await minion.enqueue(parsed.enqueue);
+    stdout.write(`${id}\n`);
+  }
+
   // Job info
-  if (isNaN(id) === false) {
+  else if (isNaN(id) === false) {
     const job = await minion.job(id);
     if (job === null) {
       stdout.write('Job does not exist.\n');
@@ -45,6 +56,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job 10023
 
 Options:
+  -e, --enqueue <task>    New job to be enqueued
   -h, --help              Show this summary of available options
   -l, --limit <number>    Number of jobs/workers to show when listing
                           them, defaults to 100

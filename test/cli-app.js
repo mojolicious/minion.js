@@ -61,6 +61,17 @@ t.test('Command app', skip, async t => {
       });
       t.match(output2.toString(), /Job does not exist/s);
     });
+
+    await t.test('Enqueue', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-e', 'test2');
+      });
+      t.match(output.toString(), /4/s);
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '4');
+      });
+      t.match(output2.toString(), /task: test2/s);
+    });
   });
 
   // Clean up once we are done
