@@ -19,7 +19,10 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       limit: Number,
       notes: String,
       offset: Number,
-      parent: [Number, Array]
+      parent: [Number, Array],
+      priority: Number,
+      queue: [String, Array],
+      lax: Boolean
     },
     {
       A: '--attempts',
@@ -30,7 +33,10 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       l: '--limit',
       n: '--notes',
       o: '--offset',
-      P: '--parent'
+      P: '--parent',
+      p: '--priority',
+      q: '--queue',
+      x: '--lax'
     },
     args,
     1
@@ -49,6 +55,12 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   if (typeof parsed.expire === 'number') options.expire = parsed.expire;
   if (typeof parsed.notes === 'string') options.notes = JSON.parse(parsed.notes);
   if (Array.isArray(parsed.parent)) options.parents = parsed.parent;
+  if (typeof parsed.priority === 'number') options.priority = parsed.priority;
+  if (Array.isArray(parsed.queue)) {
+    options.queue = parsed.queue[0];
+    options.queues = parsed.queue;
+  }
+  if (parsed.lax === true) options.lax = true;
 
   const minion = app.models.minion;
   const stdout = process.stdout;
@@ -103,4 +115,9 @@ Options:
   -o, --offset <number>     Number of jobs/workers to skip when listing
                             them, defaults to 0
   -P, --parent <id>         One or more jobs the new job depends on
+  -p, --priority <number>   Priority of new job, defaults to 0
+  -q, --queue <name>        Queue to put new job in, defaults to "default",
+                            or list only jobs in these queues
+  -x, --lax <bool>          Jobs this job depends on may also have failed
+                            to allow for it to be processed
 `;

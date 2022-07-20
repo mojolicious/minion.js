@@ -64,13 +64,13 @@ t.test('Command app', skip, async t => {
 
     await t.test('Enqueue', async t => {
       const output = await captureOutput(async () => {
-        await app.cli.start('minion-job', '-e', 'test2', '-a', '["works", 23]', '-A', '3');
+        await app.cli.start('minion-job', '-e', 'test2', '-a', '["works", 23]', '-x', '-A', '3');
       });
       t.match(output.toString(), /4/s);
       const output2 = await captureOutput(async () => {
         await app.cli.start('minion-job', '4');
       });
-      t.match(output2.toString(), /args:.+- works.+- 23.+attempts: 3.+task: test2/s);
+      t.match(output2.toString(), /args:.+- works.+- 23.+attempts: 3.+lax: true.+task: test2/s);
 
       const output3 = await captureOutput(async () => {
         await app.cli.start('minion-job', '--enqueue', 'test3');
@@ -100,13 +100,22 @@ t.test('Command app', skip, async t => {
       t.match(output8.toString(), /7.+inactive.+default.+test5/s);
 
       const output9 = await captureOutput(async () => {
-        await app.cli.start('minion-job', '-e', 'test6', '-P', '6', '--parent', '7');
+        await app.cli.start('minion-job', '-e', 'test6', '-P', '6', '--parent', '7', '-p', '8', '-q', 'important');
       });
       t.match(output9.toString(), /8/s);
       const output10 = await captureOutput(async () => {
         await app.cli.start('minion-job', '8');
       });
-      t.match(output10.toString(), /parents:.+- '6'.+- '7'.+task: test6/s);
+      t.match(output10.toString(), /parents:.+- '6'.+- '7'.+priority: 8.+queue: important.+task: test6/s);
+      const output11 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-q', 'important');
+      });
+      t.match(output11.toString(), /8.+inactive.+3.+inactive/s);
+      t.notMatch(output11.toString(), /7/s);
+      const output12 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-q', 'important', '-q', 'default');
+      });
+      t.match(output12.toString(), /8.+inactive.+7.+inactive.+3.+inactive/s);
     });
   });
 
