@@ -23,6 +23,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       parent: [Number, Array],
       priority: Number,
       queue: [String, Array],
+      state: [String, Array],
       stats: Boolean,
       task: [String, Array],
       lax: Boolean
@@ -40,6 +41,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       P: '--parent',
       p: '--priority',
       q: '--queue',
+      S: '--state',
       s: '--stats',
       t: '--task',
       x: '--lax'
@@ -66,6 +68,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     options.queue = parsed.queue[0];
     options.queues = parsed.queue;
   }
+  if (Array.isArray(parsed.state)) options.states = parsed.state;
   if (Array.isArray(parsed.task)) options.tasks = parsed.task;
   if (parsed.lax === true) options.lax = true;
 
@@ -117,6 +120,13 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
 
   node index.js minion-job
   node index.js minion-job 10023
+  node index.js minion-job -s
+  node index.js minion-job -f 10023
+  node index.js minion-job -q important -t foo -t bar -S inactive
+  node index.js minion-job -q 'host:localhost' -S inactive
+  node index.js minion-job -e foo -a '[23, "bar"]'
+  node index.js minion-job -e foo -x -P 10023 -P 10024 -p 5 -q important
+  node index.js minion-job -e 'foo' -n '{"test":123}'
 
 Options:
   -A, --attempts <number>   Number of times performing this new job will be
@@ -141,8 +151,9 @@ Options:
   -p, --priority <number>   Priority of new job, defaults to 0
   -q, --queue <name>        Queue to put new job in, defaults to "default",
                             or list only jobs in these queues
+  -S, --state <name>        List only jobs in these states
   -s, --stats               Show queue statistics
   -t, --task <name>         List only jobs for these tasks
-  -x, --lax <bool>          Jobs this job depends on may also have failed
+  -x, --lax                 Jobs this job depends on may also have failed
                             to allow for it to be processed
 `;

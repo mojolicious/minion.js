@@ -28,15 +28,17 @@ t.test('Command app', skip, async t => {
   });
 
   await t.test('minion-job', async t => {
-    await minion.enqueue('test');
+    const id = await minion.enqueue('test');
     await minion.enqueue('test2');
     await minion.enqueue('test', [], {queue: 'important'});
+    const worker = await minion.worker().register();
+    await worker.dequeue(0, {id});
 
     await t.test('List jobs', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job');
       });
-      t.match(output.toString(), /3.+inactive.+important.+test.+2.+inactive.+default.+test2.+inactive.+default.+test/s);
+      t.match(output.toString(), /3.+inactive.+important.+test.+2.+inactive.+default.+test2.+active.+default.+test/s);
 
       const output2 = await captureOutput(async () => {
         await app.cli.start('minion-job', '-l', '1');
@@ -61,7 +63,14 @@ t.test('Command app', skip, async t => {
       const output5 = await captureOutput(async () => {
         await app.cli.start('minion-job', '-t', 'test2', '--task', 'test');
       });
-      t.match(output5.toString(), /3.+inactive.+2.+inactive.+1.+inactive/s);
+      t.match(output5.toString(), /3.+inactive.+2.+inactive.+1.+active/s);
+
+      const output6 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-S', 'active');
+      });
+      t.match(output6.toString(), /1.+active.+default.+test/s);
+      t.notMatch(output6.toString(), /2/s);
+      t.notMatch(output6.toString(), /3/s);
     });
 
     await t.test('Foreground', async t => {
