@@ -1,5 +1,5 @@
 import type Minion from '../../minion.js';
-import type {ListJobsOptions} from '../../types.js';
+import type {EnqueueOptions, ListJobsOptions} from '../../types.js';
 import type {MojoApp} from '@mojojs/core';
 import {tablify} from '@mojojs/util';
 import yaml from 'js-yaml';
@@ -10,21 +10,28 @@ import nopt from 'nopt';
  */
 export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
   const parsed = nopt(
-    {enqueue: String, limit: Number, offset: Number},
-    {e: '--enqueue', l: '--limit', o: '--offset'},
+    {args: String, attempts: Number, enqueue: String, limit: Number, offset: Number},
+    {A: '--attempts', a: '--args', e: '--enqueue', l: '--limit', o: '--offset'},
     args,
     1
   );
 
-  const options = {};
-  const minion = app.models.minion;
   const id = parseInt(parsed.argv.remain[0]);
+  const minionArgs = [];
+  if (parsed.args !== undefined) {
+    const data = JSON.parse(parsed.args);
+    if (Array.isArray(data)) minionArgs.push(...data);
+  }
+  const options: EnqueueOptions & ListJobsOptions = {};
 
+  if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
+
+  const minion = app.models.minion;
   const stdout = process.stdout;
 
   // Enqueue
   if (parsed.enqueue !== undefined) {
-    const id = await minion.enqueue(parsed.enqueue);
+    const id = await minion.enqueue(parsed.enqueue, minionArgs, options);
     stdout.write(`${id}\n`);
   }
 
@@ -56,10 +63,14 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job 10023
 
 Options:
-  -e, --enqueue <task>    New job to be enqueued
-  -h, --help              Show this summary of available options
-  -l, --limit <number>    Number of jobs/workers to show when listing
-                          them, defaults to 100
-  -o, --offset <number>   Number of jobs/workers to skip when listing
-                          them, defaults to 0
+  -A, --attempts <number>   Number of times performing this new job will be
+                            attempted, defaults to 1
+  -a, --args <JSON array>   Arguments for new job or worker remote control
+                            command in JSON format
+  -e, --enqueue <task>      New job to be enqueued
+  -h, --help                Show this summary of available options
+  -l, --limit <number>      Number of jobs/workers to show when listing
+                            them, defaults to 100
+  -o, --offset <number>     Number of jobs/workers to skip when listing
+                            them, defaults to 0
 `;

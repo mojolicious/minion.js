@@ -64,13 +64,22 @@ t.test('Command app', skip, async t => {
 
     await t.test('Enqueue', async t => {
       const output = await captureOutput(async () => {
-        await app.cli.start('minion-job', '-e', 'test2');
+        await app.cli.start('minion-job', '-e', 'test2', '-a', '["works", 23]', '-A', '3');
       });
       t.match(output.toString(), /4/s);
       const output2 = await captureOutput(async () => {
         await app.cli.start('minion-job', '4');
       });
-      t.match(output2.toString(), /task: test2/s);
+      t.match(output2.toString(), /args:.+- works.+- 23.+attempts: 3.+task: test2/s);
+
+      const output3 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--enqueue', 'test3');
+      });
+      t.match(output3.toString(), /5/s);
+      const output4 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '5');
+      });
+      t.match(output4.toString(), /args: \[\].+task: test3/s);
     });
   });
 
