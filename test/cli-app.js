@@ -16,6 +16,9 @@ t.test('Command app', skip, async t => {
   app.plugin(minionPlugin, {config: pg});
 
   const minion = app.models.minion;
+  minion.addTask('test', async job => {
+    await job.finish('pass');
+  });
 
   await t.test('Help', async t => {
     const output = await captureOutput(async () => {
@@ -59,6 +62,17 @@ t.test('Command app', skip, async t => {
         await app.cli.start('minion-job', '-t', 'test2', '--task', 'test');
       });
       t.match(output5.toString(), /3.+inactive.+2.+inactive.+1.+inactive/s);
+    });
+
+    await t.test('Foreground', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-f', '1');
+      });
+      t.equal(output.toString(), '');
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '1');
+      });
+      t.match(output2.toString(), /queue: minion_foreground.+result: pass.+state: finished.task: test/s);
     });
 
     await t.test('Job info', async t => {

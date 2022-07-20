@@ -16,6 +16,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       delay: Number,
       expire: Number,
       enqueue: String,
+      foreground: Boolean,
       limit: Number,
       notes: String,
       offset: Number,
@@ -31,6 +32,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       d: '--delay',
       E: '--expire',
       e: '--enqueue',
+      f: '--foreground',
       l: '--limit',
       n: '--notes',
       o: '--offset',
@@ -51,6 +53,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     if (Array.isArray(data)) minionArgs.push(...data);
   }
   const options: EnqueueOptions & ListJobsOptions = {};
+
+  const foreground = parsed.foreground === true;
 
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
@@ -79,6 +83,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     const job = await minion.job(id);
     if (job === null) {
       stdout.write('Job does not exist.\n');
+    } else if (foreground === true) {
+      await minion.foreground(id);
     } else {
       stdout.write(yaml.dump(await job.info()));
     }
@@ -110,6 +116,9 @@ Options:
   -E, --expire <seconds>    New job is valid for this many seconds before
                             it expires
   -e, --enqueue <task>      New job to be enqueued
+  -f, --foreground          Retry job in "minion_foreground" queue and
+                            perform it right away in the foreground (very
+                            useful for debugging)
   -h, --help                Show this summary of available options
   -l, --limit <number>      Number of jobs/workers to show when listing
                             them, defaults to 100
