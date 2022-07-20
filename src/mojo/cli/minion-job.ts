@@ -10,8 +10,8 @@ import nopt from 'nopt';
  */
 export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
   const parsed = nopt(
-    {args: String, attempts: Number, enqueue: String, limit: Number, offset: Number},
-    {A: '--attempts', a: '--args', e: '--enqueue', l: '--limit', o: '--offset'},
+    {args: String, attempts: Number, delay: Number, expire: Number, enqueue: String, limit: Number, offset: Number},
+    {A: '--attempts', a: '--args', d: '--delay', E: '--expire', e: '--enqueue', l: '--limit', o: '--offset'},
     args,
     1
   );
@@ -25,6 +25,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   const options: EnqueueOptions & ListJobsOptions = {};
 
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
+  if (typeof parsed.delay === 'number') options.delay = parsed.delay;
+  if (typeof parsed.expire === 'number') options.expire = parsed.expire;
 
   const minion = app.models.minion;
   const stdout = process.stdout;
@@ -67,6 +69,9 @@ Options:
                             attempted, defaults to 1
   -a, --args <JSON array>   Arguments for new job or worker remote control
                             command in JSON format
+  -d, --delay <seconds>     Delay new job for this many seconds
+  -E, --expire <seconds>    New job is valid for this many seconds before
+                            it expires
   -e, --enqueue <task>      New job to be enqueued
   -h, --help                Show this summary of available options
   -l, --limit <number>      Number of jobs/workers to show when listing
