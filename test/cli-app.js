@@ -89,6 +89,15 @@ t.test('Command app', skip, async t => {
         await app.cli.start('minion-job', '6');
       });
       t.match(output6.toString(), /delayed: \d+-\d+-\d+T.+expires: \d+-\d+-\d+T.+task: test4/s);
+
+      const output7 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-e', 'test5', '-n', '{"some_note":"works"}');
+      });
+      t.match(output7.toString(), /7/s);
+      const output8 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--notes', '["some_note"]');
+      });
+      t.match(output8.toString(), /7.+inactive.+default.+test5/s);
     });
   });
 

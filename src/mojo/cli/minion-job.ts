@@ -10,8 +10,26 @@ import nopt from 'nopt';
  */
 export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
   const parsed = nopt(
-    {args: String, attempts: Number, delay: Number, expire: Number, enqueue: String, limit: Number, offset: Number},
-    {A: '--attempts', a: '--args', d: '--delay', E: '--expire', e: '--enqueue', l: '--limit', o: '--offset'},
+    {
+      args: String,
+      attempts: Number,
+      delay: Number,
+      expire: Number,
+      enqueue: String,
+      limit: Number,
+      notes: String,
+      offset: Number
+    },
+    {
+      A: '--attempts',
+      a: '--args',
+      d: '--delay',
+      E: '--expire',
+      e: '--enqueue',
+      l: '--limit',
+      n: '--notes',
+      o: '--offset'
+    },
     args,
     1
   );
@@ -27,6 +45,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
   if (typeof parsed.expire === 'number') options.expire = parsed.expire;
+  if (typeof parsed.notes === 'string') options.notes = JSON.parse(parsed.notes);
 
   const minion = app.models.minion;
   const stdout = process.stdout;
@@ -76,6 +95,8 @@ Options:
   -h, --help                Show this summary of available options
   -l, --limit <number>      Number of jobs/workers to show when listing
                             them, defaults to 100
+  -n, --notes <JSON>        Notes in JSON format for new job or list only
+                            jobs with one of these notes
   -o, --offset <number>     Number of jobs/workers to skip when listing
                             them, defaults to 0
 `;
