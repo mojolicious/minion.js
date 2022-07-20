@@ -23,6 +23,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       parent: [Number, Array],
       priority: Number,
       queue: [String, Array],
+      stats: Boolean,
       task: [String, Array],
       lax: Boolean
     },
@@ -39,6 +40,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       P: '--parent',
       p: '--priority',
       q: '--queue',
+      s: '--stats',
       t: '--task',
       x: '--lax'
     },
@@ -53,8 +55,6 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     if (Array.isArray(data)) minionArgs.push(...data);
   }
   const options: EnqueueOptions & ListJobsOptions = {};
-
-  const foreground = parsed.foreground === true;
 
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
@@ -72,8 +72,13 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   const minion = app.models.minion;
   const stdout = process.stdout;
 
+  // Stats
+  if (parsed.stats === true) {
+    stdout.write(yaml.dump(await minion.stats()));
+  }
+
   // Enqueue
-  if (parsed.enqueue !== undefined) {
+  else if (parsed.enqueue !== undefined) {
     const id = await minion.enqueue(parsed.enqueue, minionArgs, options);
     stdout.write(`${id}\n`);
   }
@@ -83,9 +88,15 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     const job = await minion.job(id);
     if (job === null) {
       stdout.write('Job does not exist.\n');
-    } else if (foreground === true) {
+    }
+
+    // Foreground
+    else if (parsed.foreground === true) {
       await minion.foreground(id);
-    } else {
+    }
+
+    // Job info
+    else {
       stdout.write(yaml.dump(await job.info()));
     }
   }
@@ -130,6 +141,7 @@ Options:
   -p, --priority <number>   Priority of new job, defaults to 0
   -q, --queue <name>        Queue to put new job in, defaults to "default",
                             or list only jobs in these queues
+  -s, --stats               Show queue statistics
   -t, --task <name>         List only jobs for these tasks
   -x, --lax <bool>          Jobs this job depends on may also have failed
                             to allow for it to be processed
