@@ -18,7 +18,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       enqueue: String,
       limit: Number,
       notes: String,
-      offset: Number
+      offset: Number,
+      parent: [Number, Array]
     },
     {
       A: '--attempts',
@@ -28,7 +29,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       e: '--enqueue',
       l: '--limit',
       n: '--notes',
-      o: '--offset'
+      o: '--offset',
+      P: '--parent'
     },
     args,
     1
@@ -46,6 +48,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
   if (typeof parsed.expire === 'number') options.expire = parsed.expire;
   if (typeof parsed.notes === 'string') options.notes = JSON.parse(parsed.notes);
+  if (Array.isArray(parsed.parent)) options.parents = parsed.parent;
 
   const minion = app.models.minion;
   const stdout = process.stdout;
@@ -99,4 +102,5 @@ Options:
                             jobs with one of these notes
   -o, --offset <number>     Number of jobs/workers to skip when listing
                             them, defaults to 0
+  -P, --parent <id>         One or more jobs the new job depends on
 `;
