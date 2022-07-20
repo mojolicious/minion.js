@@ -22,6 +22,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       parent: [Number, Array],
       priority: Number,
       queue: [String, Array],
+      task: [String, Array],
       lax: Boolean
     },
     {
@@ -36,6 +37,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       P: '--parent',
       p: '--priority',
       q: '--queue',
+      t: '--task',
       x: '--lax'
     },
     args,
@@ -60,6 +62,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     options.queue = parsed.queue[0];
     options.queues = parsed.queue;
   }
+  if (Array.isArray(parsed.task)) options.tasks = parsed.task;
   if (parsed.lax === true) options.lax = true;
 
   const minion = app.models.minion;
@@ -118,6 +121,7 @@ Options:
   -p, --priority <number>   Priority of new job, defaults to 0
   -q, --queue <name>        Queue to put new job in, defaults to "default",
                             or list only jobs in these queues
+  -t, --task <name>         List only jobs for these tasks
   -x, --lax <bool>          Jobs this job depends on may also have failed
                             to allow for it to be processed
 `;
