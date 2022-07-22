@@ -32,7 +32,27 @@ t.test('Command app', skip, async t => {
     await minion.enqueue('test2');
     await minion.enqueue('test', [], {queue: 'important'});
     const worker = await minion.worker().register();
+    const worker2 = await minion.worker().register();
     await worker.dequeue(0, {id});
+
+    await t.test('List workers', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-w');
+      });
+      t.match(output.toString(), new RegExp(`2 {2}.+:${process.pid}.+1 {2}.+:${process.pid}`, 's'));
+
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--workers', '--limit', '1');
+      });
+      t.match(output2.toString(), /2 {2}/s);
+      t.notMatch(output2.toString(), /1 {2}/s);
+
+      const output3 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-w', '--offset', '1');
+      });
+      t.match(output3.toString(), /1 {2}/s);
+      t.notMatch(output3.toString(), /2 {2}/s);
+    });
 
     await t.test('List jobs', async t => {
       const output = await captureOutput(async () => {

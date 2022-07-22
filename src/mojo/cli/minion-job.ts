@@ -1,5 +1,5 @@
 import type Minion from '../../minion.js';
-import type {EnqueueOptions, ListJobsOptions} from '../../types.js';
+import type {EnqueueOptions, ListJobsOptions, ListWorkersOptions} from '../../types.js';
 import type {MojoApp} from '@mojojs/core';
 import {tablify} from '@mojojs/util';
 import yaml from 'js-yaml';
@@ -17,6 +17,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       expire: Number,
       enqueue: String,
       foreground: Boolean,
+      lax: Boolean,
       limit: Number,
       notes: String,
       offset: Number,
@@ -26,7 +27,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       state: [String, Array],
       stats: Boolean,
       task: [String, Array],
-      lax: Boolean
+      workers: Boolean
     },
     {
       A: '--attempts',
@@ -44,7 +45,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       S: '--state',
       s: '--stats',
       t: '--task',
-      x: '--lax'
+      x: '--lax',
+      w: '--workers'
     },
     args,
     1
@@ -56,7 +58,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     const data = JSON.parse(parsed.args);
     if (Array.isArray(data)) minionArgs.push(...data);
   }
-  const options: EnqueueOptions & ListJobsOptions = {};
+  const options: EnqueueOptions & ListJobsOptions & ListWorkersOptions = {};
 
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
@@ -105,6 +107,11 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   }
 
   // List jobs
+  else if (parsed.workers === true) {
+    await listWorkers(minion, parsed.limit, parsed.offset, options);
+  }
+
+  // List jobs
   else {
     await listJobs(minion, parsed.limit, parsed.offset, options);
   }
@@ -115,11 +122,17 @@ async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJob
   process.stdout.write(tablify(jobs.map(job => [job.id.toString(), job.state, job.queue, job.task])));
 }
 
+async function listWorkers(minion: Minion, limit = 10, offset = 0, options: ListWorkersOptions = {}): Promise<void> {
+  const workers = (await minion.backend.listWorkers(offset, limit, options)).workers;
+  process.stdout.write(tablify(workers.map(worker => [worker.id.toString(), worker.host + ':' + worker.pid])));
+}
+
 jobCommand.description = 'Manage Minion job';
 jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
 
   node index.js minion-job
   node index.js minion-job 10023
+  node index.js minion-job -w
   node index.js minion-job -s
   node index.js minion-job -f 10023
   node index.js minion-job -q important -t foo -t bar -S inactive
@@ -154,6 +167,8 @@ Options:
   -S, --state <name>        List only jobs in these states
   -s, --stats               Show queue statistics
   -t, --task <name>         List only jobs for these tasks
+  -w, --workers             List workers instead of jobs, or show
+                            information for a specific worker
   -x, --lax                 Jobs this job depends on may also have failed
                             to allow for it to be processed
 `;
