@@ -36,24 +36,31 @@ t.test('Command app', skip, async t => {
     await worker.dequeue(0, {id});
     await minion.lock('foo', 36000);
     await minion.lock('bar', 36000);
+    await minion.lock('baz', 36000);
 
     await t.test('List locks', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job', '-L');
       });
-      t.match(output.toString(), /bar.+\d+-\d+-\d+T.+foo.+\d+-\d+-\d+T/s);
+      t.match(output.toString(), /baz.+\d+-\d+-\d+T.+bar.+\d+-\d+-\d+T.+foo.+\d+-\d+-\d+T/s);
 
       const output2 = await captureOutput(async () => {
         await app.cli.start('minion-job', '--locks', '-l', '1');
       });
-      t.match(output2.toString(), /bar.+\d+-\d+-\d+T/s);
-      t.notMatch(output2.toString(), /foo.+\d+-\d+-\d+T/s);
+      t.match(output2.toString(), /baz.+\d+-\d+-\d+T/s);
+      t.notMatch(output2.toString(), /bar/s);
 
       const output3 = await captureOutput(async () => {
         await app.cli.start('minion-job', '--locks', '-o', '1');
       });
-      t.match(output3.toString(), /foo.+\d+-\d+-\d+T/s);
-      t.notMatch(output3.toString(), /bar.+\d+-\d+-\d+T/s);
+      t.match(output3.toString(), /bar.+\d+-\d+-\d+T/s);
+      t.notMatch(output3.toString(), /baz/s);
+
+      const output4 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-L', 'baz', 'foo');
+      });
+      t.match(output4.toString(), /baz.+\d+-\d+-\d+T.+foo.+\d+-\d+-\d+T/s);
+      t.notMatch(output4.toString(), /bar/s);
     });
 
     await t.test('List workers', async t => {

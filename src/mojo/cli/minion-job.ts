@@ -1,5 +1,5 @@
 import type Minion from '../../minion.js';
-import type {EnqueueOptions, ListJobsOptions} from '../../types.js';
+import type {EnqueueOptions, ListJobsOptions, ListLocksOptions} from '../../types.js';
 import type {MojoApp} from '@mojojs/core';
 import {tablify} from '@mojojs/util';
 import yaml from 'js-yaml';
@@ -92,7 +92,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
 
   // List locks
   else if (parsed.locks === true) {
-    await listLocks(minion, parsed.limit, parsed.offset);
+    const names = parsed.argv.remain;
+    await listLocks(minion, parsed.limit, parsed.offset, {names: names.length > 0 ? names : undefined});
   }
 
   // List workers
@@ -133,17 +134,17 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
   }
 }
 
-async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJobsOptions = {}): Promise<void> {
+async function listJobs(minion: Minion, limit = 100, offset = 0, options: ListJobsOptions = {}): Promise<void> {
   const jobs = (await minion.backend.listJobs(offset, limit, options)).jobs;
   process.stdout.write(tablify(jobs.map(job => [job.id.toString(), job.state, job.queue, job.task])));
 }
 
-async function listLocks(minion: Minion, limit = 10, offset = 0): Promise<void> {
-  const locks = (await minion.backend.listLocks(offset, limit)).locks;
+async function listLocks(minion: Minion, limit = 100, offset = 0, options: ListLocksOptions): Promise<void> {
+  const locks = (await minion.backend.listLocks(offset, limit, options)).locks;
   process.stdout.write(tablify(locks.map(lock => [lock.name, lock.expires.toISOString()])));
 }
 
-async function listWorkers(minion: Minion, limit = 10, offset = 0): Promise<void> {
+async function listWorkers(minion: Minion, limit = 100, offset = 0): Promise<void> {
   const workers = (await minion.backend.listWorkers(offset, limit)).workers;
   process.stdout.write(tablify(workers.map(worker => [worker.id.toString(), worker.host + ':' + worker.pid])));
 }
@@ -163,6 +164,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -e foo -x -P 10023 -P 10024 -p 5 -q important
   node index.js minion-job -e 'foo' -n '{"test":123}'
   node index.js minion-job -L
+  node index.js minion-job -L some_lock some_other_lock
 
 Options:
   -A, --attempts <number>   Number of times performing this new job will be
