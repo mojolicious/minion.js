@@ -144,6 +144,13 @@ t.test('Command app', skip, async t => {
       t.match(output2.toString(), /queue: minion_foreground.+result: pass.+state: finished.task: test/s);
     });
 
+    await t.test('History', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-H');
+      });
+      t.match(output.toString(), /daily:.+failed_jobs: 0.+finished_jobs: 0/s);
+    });
+
     await t.test('Stats', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job', '-s');

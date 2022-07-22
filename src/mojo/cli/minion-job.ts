@@ -18,6 +18,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       expire: Number,
       enqueue: String,
       foreground: Boolean,
+      history: Boolean,
       lax: Boolean,
       limit: Number,
       locks: Boolean,
@@ -39,6 +40,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       E: '--expire',
       e: '--enqueue',
       f: '--foreground',
+      H: '--history',
       L: '--locks',
       l: '--limit',
       n: '--notes',
@@ -88,6 +90,11 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       minionArgs,
       parsed.argv.remain.map(id => parseInt(id))
     );
+  }
+
+  // History
+  else if (parsed.history === true) {
+    stdout.write(yaml.dump(await minion.history()));
   }
 
   // Stats
@@ -194,6 +201,7 @@ Options:
   -f, --foreground            Retry job in "minion_foreground" queue and
                               perform it right away in the foreground (very
                               useful for debugging)
+  -H, --history               Show queue history
   -h, --help                  Show this summary of available options
   -L, --locks                 List active named locks
   -l, --limit <number>        Number of jobs/workers to show when listing
