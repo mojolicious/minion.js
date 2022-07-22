@@ -27,6 +27,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       parent: [Number, Array],
       priority: Number,
       queue: [String, Array],
+      remove: Boolean,
       retry: Boolean,
       state: [String, Array],
       stats: Boolean,
@@ -139,6 +140,12 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       await job.retry(options);
     }
 
+    // Remove
+    else if (parsed.remove === true) {
+      const removed = await job.remove();
+      if (removed === false) stdout.write('Job is active.\n');
+    }
+
     // Foreground
     else if (parsed.foreground === true) {
       await minion.foreground(id);
@@ -219,6 +226,7 @@ Options:
   -q, --queue <name>          Queue to put new job in, defaults to "default",
                               or list only jobs in these queues
   -R, --retry                 Retry job
+      --remove                Remove job
   -S, --state <name>          List only jobs in these states
   -s, --stats                 Show queue statistics
   -t, --task <name>           List only jobs for these tasks

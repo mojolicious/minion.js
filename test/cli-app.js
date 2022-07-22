@@ -133,15 +133,6 @@ t.test('Command app', skip, async t => {
       t.notMatch(output6.toString(), /3/s);
     });
 
-    await t.test('Retry job', async t => {
-      const output = await captureOutput(async () => {
-        await app.cli.start('minion-job', '-R', '2', '-q', 'unimportant');
-      });
-      t.equal(output.toString(), '');
-      const info = await minion.job(2).then(job => job.info());
-      t.equal(info.queue, 'unimportant');
-    });
-
     await t.test('Foreground', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job', '-f', '1');
@@ -233,6 +224,30 @@ t.test('Command app', skip, async t => {
         await app.cli.start('minion-job', '-q', 'important', '-q', 'default');
       });
       t.match(output12.toString(), /8.+inactive.+7.+inactive.+3.+inactive/s);
+    });
+
+    await t.test('Retry job', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-R', '2', '-q', 'unimportant');
+      });
+      t.equal(output.toString(), '');
+      const info = await minion.job(2).then(job => job.info());
+      t.equal(info.queue, 'unimportant');
+    });
+
+    await t.test('Remove job', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--remove', '3');
+      });
+      t.equal(output.toString(), '');
+      t.same(await minion.job(3), null);
+
+      const id = await minion.enqueue('test');
+      const job = await worker.dequeue(0, {id});
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--remove', job.id.toString());
+      });
+      t.match(output2.toString(), /Job is active/s);
     });
 
     await t.test('Worker remote control commands', async t => {
