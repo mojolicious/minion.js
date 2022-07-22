@@ -133,6 +133,15 @@ t.test('Command app', skip, async t => {
       t.notMatch(output6.toString(), /3/s);
     });
 
+    await t.test('Retry job', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-R', '2', '-q', 'unimportant');
+      });
+      t.equal(output.toString(), '');
+      const info = await minion.job(2).then(job => job.info());
+      t.equal(info.queue, 'unimportant');
+    });
+
     await t.test('Foreground', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job', '-f', '1');

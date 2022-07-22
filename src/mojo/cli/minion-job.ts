@@ -27,6 +27,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       parent: [Number, Array],
       priority: Number,
       queue: [String, Array],
+      retry: Boolean,
       state: [String, Array],
       stats: Boolean,
       task: [String, Array],
@@ -48,6 +49,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       P: '--parent',
       p: '--priority',
       q: '--queue',
+      R: '--retry',
       S: '--state',
       s: '--stats',
       t: '--task',
@@ -126,13 +128,15 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     } else {
       await listWorkers(minion, parsed.limit, parsed.offset);
     }
-  }
-
-  // Job info
-  else if (isNaN(id) === false) {
+  } else if (isNaN(id) === false) {
     const job = await minion.job(id);
     if (job === null) {
       stdout.write('Job does not exist.\n');
+    }
+
+    // Retry
+    else if (parsed.retry === true) {
+      await job.retry(options);
     }
 
     // Foreground
@@ -214,6 +218,7 @@ Options:
   -p, --priority <number>     Priority of new job, defaults to 0
   -q, --queue <name>          Queue to put new job in, defaults to "default",
                               or list only jobs in these queues
+  -R, --retry                 Retry job
   -S, --state <name>          List only jobs in these states
   -s, --stats                 Show queue statistics
   -t, --task <name>           List only jobs for these tasks
