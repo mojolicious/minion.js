@@ -32,7 +32,7 @@ t.test('Command app', skip, async t => {
     await minion.enqueue('test2');
     await minion.enqueue('test', [], {queue: 'important'});
     const worker = await minion.worker().register();
-    const worker2 = await minion.worker().register();
+    await minion.worker().register();
     await worker.dequeue(0, {id});
 
     await t.test('List workers', async t => {
