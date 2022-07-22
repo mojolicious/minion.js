@@ -106,7 +106,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     }
   }
 
-  // List jobs
+  // List workers
   else if (parsed.workers === true) {
     await listWorkers(minion, parsed.limit, parsed.offset, options);
   }
