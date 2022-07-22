@@ -54,6 +54,18 @@ t.test('Command app', skip, async t => {
       t.notMatch(output3.toString(), /2 {2}/s);
     });
 
+    await t.test('Worker info', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-w', '1');
+      });
+      t.match(output.toString(), /id: 1.+jobs:.+- '1'/s);
+
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--worker', '1000');
+      });
+      t.match(output2.toString(), /Worker does not exist/s);
+    });
+
     await t.test('List jobs', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job');

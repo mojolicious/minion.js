@@ -88,6 +88,20 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     stdout.write(`${id}\n`);
   }
 
+  // List workers
+  else if (parsed.workers === true) {
+    if (isNaN(id) === false) {
+      const worker = (await minion.backend.listWorkers(0, 1, {ids: [id]})).workers[0];
+      if (worker === undefined) {
+        stdout.write('Worker does not exist.\n');
+      } else {
+        stdout.write(yaml.dump(worker));
+      }
+    } else {
+      await listWorkers(minion, parsed.limit, parsed.offset, options);
+    }
+  }
+
   // Job info
   else if (isNaN(id) === false) {
     const job = await minion.job(id);
@@ -104,11 +118,6 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     else {
       stdout.write(yaml.dump(await job.info()));
     }
-  }
-
-  // List workers
-  else if (parsed.workers === true) {
-    await listWorkers(minion, parsed.limit, parsed.offset, options);
   }
 
   // List jobs
@@ -133,6 +142,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job
   node index.js minion-job 10023
   node index.js minion-job -w
+  node index.js minion-job -w 23
   node index.js minion-job -s
   node index.js minion-job -f 10023
   node index.js minion-job -q important -t foo -t bar -S inactive
