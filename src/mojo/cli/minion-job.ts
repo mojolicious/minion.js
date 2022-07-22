@@ -1,5 +1,5 @@
 import type Minion from '../../minion.js';
-import type {EnqueueOptions, ListJobsOptions, ListWorkersOptions} from '../../types.js';
+import type {EnqueueOptions, ListJobsOptions} from '../../types.js';
 import type {MojoApp} from '@mojojs/core';
 import {tablify} from '@mojojs/util';
 import yaml from 'js-yaml';
@@ -19,6 +19,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       foreground: Boolean,
       lax: Boolean,
       limit: Number,
+      locks: Boolean,
       notes: String,
       offset: Number,
       parent: [Number, Array],
@@ -36,6 +37,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       E: '--expire',
       e: '--enqueue',
       f: '--foreground',
+      L: '--locks',
       l: '--limit',
       n: '--notes',
       o: '--offset',
@@ -58,7 +60,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     const data = JSON.parse(parsed.args);
     if (Array.isArray(data)) minionArgs.push(...data);
   }
-  const options: EnqueueOptions & ListJobsOptions & ListWorkersOptions = {};
+  const options: EnqueueOptions & ListJobsOptions = {};
 
   if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
   if (typeof parsed.delay === 'number') options.delay = parsed.delay;
@@ -88,6 +90,11 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     stdout.write(`${id}\n`);
   }
 
+  // List locks
+  else if (parsed.locks === true) {
+    await listLocks(minion, parsed.limit, parsed.offset);
+  }
+
   // List workers
   else if (parsed.workers === true) {
     if (isNaN(id) === false) {
@@ -98,7 +105,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
         stdout.write(yaml.dump(worker));
       }
     } else {
-      await listWorkers(minion, parsed.limit, parsed.offset, options);
+      await listWorkers(minion, parsed.limit, parsed.offset);
     }
   }
 
@@ -131,8 +138,13 @@ async function listJobs(minion: Minion, limit = 10, offset = 0, options: ListJob
   process.stdout.write(tablify(jobs.map(job => [job.id.toString(), job.state, job.queue, job.task])));
 }
 
-async function listWorkers(minion: Minion, limit = 10, offset = 0, options: ListWorkersOptions = {}): Promise<void> {
-  const workers = (await minion.backend.listWorkers(offset, limit, options)).workers;
+async function listLocks(minion: Minion, limit = 10, offset = 0): Promise<void> {
+  const locks = (await minion.backend.listLocks(offset, limit)).locks;
+  process.stdout.write(tablify(locks.map(lock => [lock.name, lock.expires.toISOString()])));
+}
+
+async function listWorkers(minion: Minion, limit = 10, offset = 0): Promise<void> {
+  const workers = (await minion.backend.listWorkers(offset, limit)).workers;
   process.stdout.write(tablify(workers.map(worker => [worker.id.toString(), worker.host + ':' + worker.pid])));
 }
 
@@ -150,6 +162,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -e foo -a '[23, "bar"]'
   node index.js minion-job -e foo -x -P 10023 -P 10024 -p 5 -q important
   node index.js minion-job -e 'foo' -n '{"test":123}'
+  node index.js minion-job -L
 
 Options:
   -A, --attempts <number>   Number of times performing this new job will be
@@ -164,6 +177,7 @@ Options:
                             perform it right away in the foreground (very
                             useful for debugging)
   -h, --help                Show this summary of available options
+  -L, --locks               List active named locks
   -l, --limit <number>      Number of jobs/workers to show when listing
                             them, defaults to 100
   -n, --notes <JSON>        Notes in JSON format for new job or list only
