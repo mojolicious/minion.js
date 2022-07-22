@@ -32,7 +32,7 @@ t.test('Command app', skip, async t => {
     await minion.enqueue('test2');
     await minion.enqueue('test', [], {queue: 'important'});
     const worker = await minion.worker().register();
-    await minion.worker().register();
+    const worker2 = await minion.worker().register();
     await worker.dequeue(0, {id});
     await minion.lock('foo', 36000);
     await minion.lock('bar', 36000);
@@ -217,6 +217,47 @@ t.test('Command app', skip, async t => {
         await app.cli.start('minion-job', '-q', 'important', '-q', 'default');
       });
       t.match(output12.toString(), /8.+inactive.+7.+inactive.+3.+inactive/s);
+    });
+
+    await t.test('Worker remote control commands', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '-b', 'one');
+      });
+      t.equal(output.toString(), '');
+      let results = [];
+      worker.addCommand('one', async (worker, ...args) => results.push(['one:1', ...args]));
+      worker2.addCommand('one', async (worker, ...args) => results.push(['one:2', ...args]));
+      worker2.addCommand('two', async (worker, ...args) => results.push(['two:2', ...args]));
+      await worker.processCommands();
+      await worker2.processCommands();
+      t.same(results, [['one:1'], ['one:2']]);
+
+      results = [];
+      await app.cli.start('minion-job', '-b', 'one', '1');
+      await worker.processCommands();
+      await worker2.processCommands();
+      t.same(results, [['one:1']]);
+
+      results = [];
+      await app.cli.start('minion-job', '-b', 'one', '1', '2');
+      await worker.processCommands();
+      await worker2.processCommands();
+      t.same(results, [['one:1'], ['one:2']]);
+
+      results = [];
+      await app.cli.start('minion-job', '-b', 'two');
+      await worker.processCommands();
+      await worker2.processCommands();
+      t.same(results, [['two:2']]);
+
+      results = [];
+      await app.cli.start('minion-job', '-b', 'one', '-a', '["foo", {"bar": 23}]');
+      await worker.processCommands();
+      await worker2.processCommands();
+      t.same(results, [
+        ['one:1', 'foo', {bar: 23}],
+        ['one:2', 'foo', {bar: 23}]
+      ]);
     });
   });
 
