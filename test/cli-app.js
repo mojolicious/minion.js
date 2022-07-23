@@ -250,6 +250,46 @@ t.test('Command app', skip, async t => {
       t.match(output2.toString(), /Job is active/s);
     });
 
+    await t.test('Retry failed jobs', async t => {
+      const id = await minion.enqueue('test');
+      const id2 = await minion.enqueue('test');
+      const id3 = await minion.enqueue('test');
+      const job = await worker.dequeue(0, {id});
+      const job2 = await worker.dequeue(0, {id: id2});
+      const job3 = await worker.dequeue(0, {id: id3});
+      await job.fail();
+      await job2.fail();
+      await job3.finish();
+
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--retry-failed');
+      });
+      t.equal(output.toString(), '');
+      t.equal((await job.info()).state, 'inactive');
+      t.equal((await job2.info()).state, 'inactive');
+      t.equal((await job3.info()).state, 'finished');
+    });
+
+    await t.test('Remove failed jobs', async t => {
+      const id = await minion.enqueue('test');
+      const id2 = await minion.enqueue('test');
+      const id3 = await minion.enqueue('test');
+      const job = await worker.dequeue(0, {id});
+      const job2 = await worker.dequeue(0, {id: id2});
+      const job3 = await worker.dequeue(0, {id: id3});
+      await job.fail();
+      await job2.fail();
+      await job3.finish();
+
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-job', '--remove-failed');
+      });
+      t.equal(output.toString(), '');
+      t.same(await job.info(), null);
+      t.same(await job2.info(), null);
+      t.equal((await job3.info()).state, 'finished');
+    });
+
     await t.test('Worker remote control commands', async t => {
       const output = await captureOutput(async () => {
         await app.cli.start('minion-job', '-b', 'one');

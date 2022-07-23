@@ -29,6 +29,8 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
       queue: [String, Array],
       remove: Boolean,
       retry: Boolean,
+      'remove-failed': Boolean,
+      'retry-failed': Boolean,
       state: [String, Array],
       stats: Boolean,
       task: [String, Array],
@@ -129,7 +131,24 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     } else {
       await listWorkers(minion, parsed.limit, parsed.offset);
     }
-  } else if (isNaN(id) === false) {
+  }
+
+  // Retry all failed jobs
+  else if (parsed['retry-failed'] === true) {
+    for await (const job of minion.jobs({states: ['failed']})) {
+      await minion.job(job.id).then(job => job?.retry(options));
+    }
+  }
+
+  // Remove all failed jobs
+  else if (parsed['remove-failed'] === true) {
+    for await (const job of minion.jobs({states: ['failed']})) {
+      await minion.job(job.id).then(job => job?.remove());
+    }
+  }
+
+  // Job actions
+  else if (isNaN(id) === false) {
     const job = await minion.job(id);
     if (job === null) {
       stdout.write('Job does not exist.\n');
@@ -194,6 +213,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -e 'foo' -n '{"test":123}'
   node index.js minion-job -R -d 10 -E 300 10023
   node index.js minion-job --remove 10023
+  node index.js minion-job --retry-failed
   node index.js minion-job -n '["test"]'
   node index.js minion-job -L
   node index.js minion-job -L some_lock some_other_lock
@@ -228,7 +248,9 @@ Options:
   -q, --queue <name>          Queue to put new job in, defaults to "default",
                               or list only jobs in these queues
   -R, --retry                 Retry job
+      --retry-failed          Retry all failed jobs at once
       --remove                Remove job
+      --remove-failed         Remove all failed jobs at once
   -S, --state <name>          List only jobs in these states
   -s, --stats                 Show queue statistics
   -t, --task <name>           List only jobs for these tasks
