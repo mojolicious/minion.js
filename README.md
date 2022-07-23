@@ -5,7 +5,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/mojolicious/minion.js/badge.svg?branch=main)](https://coveralls.io/github/mojolicious/minion.js?branch=main)
 [![npm](https://img.shields.io/npm/v/@minionjs/core.svg)](https://www.npmjs.com/package/@minionjs/core)
 
-A high performance job queue for Node.js. Written in TypeScript. ***WORK IN PROGRESS***
+***WORK IN PROGRESS!*** A high performance job queue for Node.js. Written in TypeScript. Also available for
+[Perl](https://github.com/mojolicious/minion).
 
 Minion.js comes with support for multiple named queues, priorities, high priority fast lane, delayed jobs,
 job dependencies, job progress, job results, retries with backoff, rate limiting, unique jobs, expiring jobs,
