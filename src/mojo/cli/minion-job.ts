@@ -192,6 +192,8 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -e foo -a '[23, "bar"]'
   node index.js minion-job -e foo -x -P 10023 -P 10024 -p 5 -q important
   node index.js minion-job -e 'foo' -n '{"test":123}'
+  node index.js minion-job -R -d 10 -E 300 10023
+  node index.js minion-job --remove 10023
   node index.js minion-job -n '["test"]'
   node index.js minion-job -L
   node index.js minion-job -L some_lock some_other_lock
