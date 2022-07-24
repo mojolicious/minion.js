@@ -116,8 +116,8 @@ export class PgBackend {
   }
 
   /**
-   * Wait a given amount of time in seconds for a job, dequeue it and transition from `inactive` to `active` state,
-   * or return `null` if queues were empty.
+   * Wait a given amount of time in milliseconds for a job, dequeue it and transition from `inactive` to `active`
+   * state, or return `null` if queues were empty.
    */
   async dequeue(id: MinionWorkerId, wait: number, options: DequeueOptions): Promise<DequeuedJob | null> {
     const job = await this._try(id, options);
@@ -153,8 +153,8 @@ export class PgBackend {
     const results = await this.pg.rawQuery<EnqueueResult>(
       `
         INSERT INTO minion_jobs (args, attempts, delayed, expires, lax, notes, parents, priority, queue, task)
-        VALUES ($1, $2, (NOW() + (INTERVAL '1 second' * $3)),
-          CASE WHEN $4::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * $4::BIGINT) END,
+        VALUES ($1, $2, (NOW() + (INTERVAL '1 millisecond' * $3)),
+          CASE WHEN $4::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 millisecond' * $4::BIGINT) END,
           $5, $6, $7, $8, $9, $10
         )
         RETURNING id
@@ -282,12 +282,12 @@ export class PgBackend {
   }
 
   /**
-   * Try to acquire a named lock that will expire automatically after the given amount of time in seconds. An
+   * Try to acquire a named lock that will expire automatically after the given amount of time in milliseconds. An
    * expiration time of `0` can be used to check if a named lock already exists without creating one.
    */
   async lock(name: string, duration: number, options: LockOptions = {}): Promise<boolean> {
     const limit = options.limit ?? 1;
-    const results = await this.pg.query<LockResult>`SELECT * FROM minion_lock(${name}, ${duration}, ${limit})`;
+    const results = await this.pg.query<LockResult>`SELECT * FROM minion_lock(${name}, ${duration / 1000}, ${limit})`;
     return results.first.minion_lock;
   }
 
@@ -344,14 +344,16 @@ export class PgBackend {
     const minion = this.minion;
 
     // Workers without heartbeat
-    await pg.query`DELETE FROM minion_workers WHERE notified < NOW() - INTERVAL '1 second' * ${minion.missingAfter}`;
+    await pg.query`
+      DELETE FROM minion_workers WHERE notified < NOW() - INTERVAL '1 millisecond' * ${minion.missingAfter}
+    `;
 
     // Old jobs with no unresolved dependencies and expired jobs
     await pg.query`
       DELETE FROM minion_jobs WHERE id IN (
         SELECT j.id FROM minion_jobs AS j LEFT JOIN minion_jobs AS children
           ON children.state != 'finished' AND ARRAY_LENGTH(children.parents, 1) > 0 AND j.id = ANY(children.parents)
-        WHERE j.state = 'finished' AND j.finished <= NOW() - INTERVAL '1 second' * ${minion.removeAfter}
+        WHERE j.state = 'finished' AND j.finished <= NOW() - INTERVAL '1 millisecond' * ${minion.removeAfter}
           AND children.id IS NULL
         UNION ALL
         SELECT id FROM minion_jobs WHERE state = 'inactive' AND expires <= NOW()
@@ -371,7 +373,7 @@ export class PgBackend {
     // Jobs in queue without workers or not enough workers (cannot be retried and requires admin attention)
     await pg.query`
       UPDATE minion_jobs SET state = 'failed', result = '"Job appears stuck in queue"'
-          WHERE state = 'inactive' AND delayed + ${minion.stuckAfter} * INTERVAL '1 second' < NOW()
+          WHERE state = 'inactive' AND delayed + ${minion.stuckAfter} * INTERVAL '1 millisecond' < NOW()
     `;
   }
 
@@ -389,8 +391,13 @@ export class PgBackend {
   async retryJob(id: MinionJobId, retries: number, options: RetryOptions = {}): Promise<boolean> {
     const results = await this.pg.rawQuery(
       `
-        UPDATE minion_jobs SET attempts = COALESCE($1, attempts), delayed = (NOW() + (INTERVAL '1 second' * $2)),
-          expires = CASE WHEN $3::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 second' * $3::BIGINT) ELSE expires END,
+        UPDATE minion_jobs SET attempts = COALESCE($1, attempts), delayed = (NOW() + (INTERVAL '1 millisecond' * $2)),
+          expires =
+            CASE WHEN $3::BIGINT IS NOT NULL THEN
+              NOW() + (INTERVAL '1 millisecond' * $3::BIGINT)
+            ELSE
+              expires
+            END,
           lax = COALESCE($4, lax), parents = COALESCE($5, parents), priority = COALESCE($6, priority),
           queue = COALESCE($7, queue), retried = NOW(), retries = retries + 1, state = 'inactive'
         WHERE id = $8 AND retries = $9

@@ -190,7 +190,7 @@ t.test('Command app', skip, async t => {
       t.match(output4.toString(), /args: \[\].+task: test3/s);
 
       const output5 = await captureOutput(async () => {
-        await app.cli.start('minion-job', '-e', 'test4', '-E', '300', '-d', '30');
+        await app.cli.start('minion-job', '-e', 'test4', '-E', '300000', '-d', '30000');
       });
       t.match(output5.toString(), /6/s);
       const output6 = await captureOutput(async () => {

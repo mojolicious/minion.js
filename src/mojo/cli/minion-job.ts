@@ -211,7 +211,7 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -e foo -a '[23, "bar"]'
   node index.js minion-job -e foo -x -P 10023 -P 10024 -p 5 -q important
   node index.js minion-job -e 'foo' -n '{"test":123}'
-  node index.js minion-job -R -d 10 -E 300 10023
+  node index.js minion-job -R -d 10000 -E 300000 10023
   node index.js minion-job --remove 10023
   node index.js minion-job --retry-failed
   node index.js minion-job -n '["test"]'
@@ -221,41 +221,41 @@ jobCommand.usage = `Usage: APPLICATION minion-job [OPTIONS] [IDS]
   node index.js minion-job -b jobs -a '[12]' 23 24 25
 
 Options:
-  -A, --attempts <number>     Number of times performing this new job will be
-                              attempted, defaults to 1
-  -a, --args <JSON array>     Arguments for new job or worker remote control
-                              command in JSON format
-  -b, --broadcast <command>   Broadcast remote control command to one or more
-                              workers
-  -d, --delay <seconds>       Delay new job for this many seconds
-  -E, --expire <seconds>      New job is valid for this many seconds before
-                              it expires
-  -e, --enqueue <task>        New job to be enqueued
-  -f, --foreground            Retry job in "minion_foreground" queue and
-                              perform it right away in the foreground (very
-                              useful for debugging)
-  -H, --history               Show queue history
-  -h, --help                  Show this summary of available options
-  -L, --locks                 List active named locks
-  -l, --limit <number>        Number of jobs/workers to show when listing
-                              them, defaults to 100
-  -n, --notes <JSON>          Notes in JSON format for new job or list only
-                              jobs with one of these notes
-  -o, --offset <number>       Number of jobs/workers to skip when listing
-                              them, defaults to 0
-  -P, --parent <id>           One or more jobs the new job depends on
-  -p, --priority <number>     Priority of new job, defaults to 0
-  -q, --queue <name>          Queue to put new job in, defaults to "default",
-                              or list only jobs in these queues
-  -R, --retry                 Retry job
-      --retry-failed          Retry all failed jobs at once
-      --remove                Remove job
-      --remove-failed         Remove all failed jobs at once
-  -S, --state <name>          List only jobs in these states
-  -s, --stats                 Show queue statistics
-  -t, --task <name>           List only jobs for these tasks
-  -w, --workers               List workers instead of jobs, or show
-                              information for a specific worker
-  -x, --lax                   Jobs this job depends on may also have failed
-                              to allow for it to be processed
+  -A, --attempts <number>       Number of times performing this new job will
+                                be attempted, defaults to 1
+  -a, --args <JSON array>       Arguments for new job or worker remote control
+                                command in JSON format
+  -b, --broadcast <command>     Broadcast remote control command to one or
+                                more workers
+  -d, --delay <milliseconds>    Delay new job for this many milliseconds
+  -E, --expire <milliseconds>   New job is valid for this many milliseconds
+                                before it expires
+  -e, --enqueue <task>          New job to be enqueued
+  -f, --foreground              Retry job in "minion_foreground" queue and
+                                perform it right away in the foreground (very
+                                useful for debugging)
+  -H, --history                 Show queue history
+  -h, --help                    Show this summary of available options
+  -L, --locks                   List active named locks
+  -l, --limit <number>          Number of jobs/workers to show when listing
+                                them, defaults to 100
+  -n, --notes <JSON>            Notes in JSON format for new job or list only
+                                jobs with one of these notes
+  -o, --offset <number>         Number of jobs/workers to skip when listing
+                                them, defaults to 0
+  -P, --parent <id>             One or more jobs the new job depends on
+  -p, --priority <number>       Priority of new job, defaults to 0
+  -q, --queue <name>            Queue to put new job in, defaults to
+                                "default", or list only jobs in these queues
+  -R, --retry                   Retry job
+      --retry-failed            Retry all failed jobs at once
+      --remove                  Remove job
+      --remove-failed           Remove all failed jobs at once
+  -S, --state <name>            List only jobs in these states
+  -s, --stats                   Show queue statistics
+  -t, --task <name>             List only jobs for these tasks
+  -w, --workers                 List workers instead of jobs, or show
+                                information for a specific worker
+  -x, --lax                     Jobs this job depends on may also have failed
+                                to allow for it to be processed
 `;

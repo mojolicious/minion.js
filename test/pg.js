@@ -137,7 +137,7 @@ t.test('PostgreSQL backend', skip, async t => {
     const missingAfter = minion.missingAfter + 1;
     t.ok(await worker2.info());
     await minion.backend.pg.query`
-      UPDATE minion_workers SET notified = NOW() - INTERVAL '1 second' * ${missingAfter} WHERE id = ${workerId}
+      UPDATE minion_workers SET notified = NOW() - INTERVAL '1 millisecond' * ${missingAfter} WHERE id = ${workerId}
     `;
 
     await minion.repair();
@@ -173,7 +173,7 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Repair old jobs', async t => {
-    t.equal(minion.removeAfter, 172800);
+    t.equal(minion.removeAfter, 172800000);
 
     const worker = await minion.worker().register();
     const id = await minion.enqueue('test');
@@ -206,7 +206,7 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Repair stuck jobs', async t => {
-    t.equal(minion.stuckAfter, 172800);
+    t.equal(minion.stuckAfter, 172800000);
 
     const worker = await minion.worker().register();
     const id = await minion.enqueue('test');
@@ -329,33 +329,33 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Exclusive lock', async t => {
-    t.ok(await minion.lock('foo', 3600));
-    t.ok(!(await minion.lock('foo', 3600)));
+    t.ok(await minion.lock('foo', 3600000));
+    t.ok(!(await minion.lock('foo', 3600000)));
     t.ok(await minion.unlock('foo'));
     t.ok(!(await minion.unlock('foo')));
-    t.ok(await minion.lock('foo', -3600));
+    t.ok(await minion.lock('foo', -3600000));
     t.ok(await minion.lock('foo', 0));
     t.ok(!(await minion.isLocked('foo')));
-    t.ok(await minion.lock('foo', 3600));
+    t.ok(await minion.lock('foo', 3600000));
     t.ok(await minion.isLocked('foo'));
-    t.ok(!(await minion.lock('foo', -3600)));
-    t.ok(!(await minion.lock('foo', 3600)));
+    t.ok(!(await minion.lock('foo', -3600000)));
+    t.ok(!(await minion.lock('foo', 3600000)));
     t.ok(await minion.unlock('foo'));
     t.ok(!(await minion.unlock('foo')));
-    t.ok(await minion.lock('foo', 3600, {limit: 1}));
-    t.ok(!(await minion.lock('foo', 3600, {limit: 1})));
+    t.ok(await minion.lock('foo', 3600000, {limit: 1}));
+    t.ok(!(await minion.lock('foo', 3600000, {limit: 1})));
   });
 
   await t.test('Shared lock', async t => {
-    t.ok(await minion.lock('bar', 3600, {limit: 3}));
-    t.ok(await minion.lock('bar', 3600, {limit: 3}));
+    t.ok(await minion.lock('bar', 3600000, {limit: 3}));
+    t.ok(await minion.lock('bar', 3600000, {limit: 3}));
     t.ok(await minion.isLocked('bar'));
-    t.ok(await minion.lock('bar', -3600, {limit: 3}));
-    t.ok(await minion.lock('bar', 3600, {limit: 3}));
-    t.ok(!(await minion.lock('bar', 3600, {limit: 3})));
-    t.ok(await minion.lock('baz', 3600, {limit: 3}));
+    t.ok(await minion.lock('bar', -3600000, {limit: 3}));
+    t.ok(await minion.lock('bar', 3600000, {limit: 3}));
+    t.ok(!(await minion.lock('bar', 3600000, {limit: 3})));
+    t.ok(await minion.lock('baz', 3600000, {limit: 3}));
     t.ok(await minion.unlock('bar'));
-    t.ok(await minion.lock('bar', 3600, {limit: 3}));
+    t.ok(await minion.lock('bar', 3600000, {limit: 3}));
     t.ok(await minion.unlock('bar'));
     t.ok(await minion.unlock('bar'));
     t.ok(await minion.unlock('bar'));
@@ -374,9 +374,9 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal(results.total, 1);
     await minion.unlock('foo');
 
-    await minion.lock('yada', 3600, {limit: 2});
-    await minion.lock('test', 3600, {limit: 1});
-    await minion.lock('yada', 3600, {limit: 2});
+    await minion.lock('yada', 3600000, {limit: 2});
+    await minion.lock('test', 3600000, {limit: 1});
+    await minion.lock('yada', 3600000, {limit: 2});
     t.equal((await minion.stats()).active_locks, 3);
     const results2 = await minion.backend.listLocks(1, 1);
     t.equal(results2.locks[0].name, 'test');
@@ -401,7 +401,7 @@ t.test('PostgreSQL backend', skip, async t => {
 
   await t.test('Reset (locks)', async t => {
     await minion.enqueue('test');
-    await minion.lock('test', 3600);
+    await minion.lock('test', 3600000);
     await minion.worker().register();
     t.equal((await minion.backend.listJobs(0, 1)).total, 1);
     t.equal((await minion.backend.listLocks(0, 1)).total, 1);
@@ -413,7 +413,7 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Reset (all)', async t => {
-    await minion.lock('test', 3600);
+    await minion.lock('test', 3600000);
     t.equal((await minion.backend.listJobs(0, 1)).total, 1);
     t.equal((await minion.backend.listLocks(0, 1)).total, 1);
     t.equal((await minion.backend.listWorkers(0, 1)).total, 1);
@@ -766,7 +766,7 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Delayed jobs', async t => {
-    const id = await minion.enqueue('add', [2, 1], {delay: 100});
+    const id = await minion.enqueue('add', [2, 1], {delay: 100000});
     t.equal((await minion.stats()).delayed_jobs, 1);
     const worker = await minion.worker().register();
     t.notOk(await worker.dequeue());
@@ -791,7 +791,7 @@ t.test('PostgreSQL backend', skip, async t => {
     const info3 = await job4.info();
     t.ok(info3.delayed <= info3.created);
     t.ok(await job4.fail());
-    t.ok(await job4.retry({delay: 100}));
+    t.ok(await job4.retry({delay: 100000}));
     const info4 = await job4.info();
     t.equal(info4.retries, 1);
     t.ok(info4.delayed > info4.retried);
@@ -1033,7 +1033,7 @@ t.test('PostgreSQL backend', skip, async t => {
     await minion.repair();
     t.equal((await minion.stats()).finished_jobs, 0);
 
-    minion.removeAfter = 172800;
+    minion.removeAfter = 172800000;
     const id4 = await minion.enqueue('test', [], {parents: [-1]});
     const job5 = await worker.dequeue();
     t.equal(job5.id, id4);
@@ -1116,7 +1116,7 @@ t.test('PostgreSQL backend', skip, async t => {
     t.notOk((await minion.job(id).then(job => job.info())).expires);
     t.ok(await minion.job(id).then(job => job.remove()));
 
-    const id2 = await minion.enqueue('test', [], {expire: 300});
+    const id2 = await minion.enqueue('test', [], {expire: 300000});
     t.same((await minion.job(id2).then(job => job.info())).expires instanceof Date, true);
     const worker = await minion.worker().register();
     const job = await worker.dequeue();
@@ -1124,7 +1124,7 @@ t.test('PostgreSQL backend', skip, async t => {
     const expires = (await job.info()).expires;
     t.same(expires instanceof Date, true);
     t.ok(await job.finish());
-    t.ok(await job.retry({expire: 600}));
+    t.ok(await job.retry({expire: 600000}));
     const info = await minion.job(id2).then(job => job.info());
     t.equal(info.state, 'inactive');
     t.same(info.expires instanceof Date, true);
@@ -1135,14 +1135,14 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal(job2.id, id2);
     t.ok(await job2.finish());
 
-    const id3 = await minion.enqueue('test', [], {expire: 300});
+    const id3 = await minion.enqueue('test', [], {expire: 300000});
     t.equal(await minion.jobs({states: ['inactive']}).total(), 1);
     await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id3}`;
     await minion.repair();
     t.notOk(await worker.dequeue());
     t.equal(await minion.jobs({states: ['inactive']}).total(), 0);
 
-    const id4 = await minion.enqueue('test', [], {expire: 300});
+    const id4 = await minion.enqueue('test', [], {expire: 300000});
     const job4 = await worker.dequeue();
     t.equal(job4.id, id4);
     t.ok(await job4.finish());
@@ -1150,7 +1150,7 @@ t.test('PostgreSQL backend', skip, async t => {
     await minion.repair();
     t.equal((await job4.info()).state, 'finished');
 
-    const id5 = await minion.enqueue('test', [], {expire: 300});
+    const id5 = await minion.enqueue('test', [], {expire: 300000});
     const job5 = await worker.dequeue();
     t.equal(job5.id, id5);
     t.ok(await job5.fail());
@@ -1158,7 +1158,7 @@ t.test('PostgreSQL backend', skip, async t => {
     await minion.repair();
     t.equal((await job5.info()).state, 'failed');
 
-    const id6 = await minion.enqueue('test', [], {expire: 300});
+    const id6 = await minion.enqueue('test', [], {expire: 300000});
     const job6 = await worker.dequeue();
     t.equal(job6.id, id6);
     await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id6}`;
@@ -1166,8 +1166,8 @@ t.test('PostgreSQL backend', skip, async t => {
     t.equal((await job6.info()).state, 'active');
     t.ok(await job6.finish());
 
-    const id7 = await minion.enqueue('test', [], {expire: 300});
-    const id8 = await minion.enqueue('test', [], {expire: 300, parents: [id7]});
+    const id7 = await minion.enqueue('test', [], {expire: 300000});
+    const id8 = await minion.enqueue('test', [], {expire: 300000, parents: [id7]});
     t.notOk(await worker.dequeue(0, {id: id8}));
     await minion.backend.pg.query`UPDATE minion_jobs SET expires = NOW() - INTERVAL '1 day' WHERE id = ${id7}`;
     await minion.repair();

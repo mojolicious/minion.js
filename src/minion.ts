@@ -53,21 +53,21 @@ export default class Minion {
    */
   backend: MinionBackend;
   /**
-   * Amount of time in seconds after which workers without a heartbeat will be considered missing and removed from
-   * the registry by `minion.repair()`, defaults to `1800` (30 minutes).
+   * Amount of time in milliseconds after which workers without a heartbeat will be considered missing and removed from
+   * the registry by `minion.repair()`, defaults to `1800000` (30 minutes).
    */
-  missingAfter = 1800;
+  missingAfter = 1800000;
   /**
-   * Amount of time in seconds after which jobs that have reached the state `finished` and have no unresolved
-   * dependencies will be removed automatically by `minion.repair()`, defaults to `172800` (2 days). It is not
+   * Amount of time in milliseconds after which jobs that have reached the state `finished` and have no unresolved
+   * dependencies will be removed automatically by `minion.repair()`, defaults to `172800000` (2 days). It is not
    * recommended to set this value below 2 days.
    */
-  removeAfter = 172800;
+  removeAfter = 172800000;
   /**
-   * Amount of time in seconds after which jobs that have not been processed will be considered stuck by
-   * `minion.repair()` and transition to the `failed` state, defaults to `172800` (2 days).
+   * Amount of time in milliseconds after which jobs that have not been processed will be considered stuck by
+   * `minion.repair()` and transition to the `failed` state, defaults to `172800000` (2 days).
    */
-  stuckAfter = 172800;
+  stuckAfter = 172800000;
   /**
    * Registered tasks.
    */
@@ -115,8 +115,8 @@ export default class Minion {
    * objects that cannot be serialized, nested data structures are fine though.
    * @param options.attempts - Number of times performing this job will be attempted, with a delay based on
    *                           `minion.backoff()` after the first attempt, defaults to `1`.
-   * @param options.delay - Delay job for this many seconds (from now), defaults to `0`.
-   * @param options.expire - Job is valid for this many seconds (from now) before it expires.
+   * @param options.delay - Delay job for this many milliseconds (from now), defaults to `0`.
+   * @param options.expire - Job is valid for this many milliseconds (from now) before it expires.
    * @param options.lax - Existing jobs this job depends on may also have transitioned to the `failed` state to allow
    *                      for it to be processed, defaults to `false`.
    * @param options.notes - Object with arbitrary metadata for this job that gets serialized as JSON.
@@ -187,7 +187,7 @@ export default class Minion {
   }
 
   /**
-   * Try to acquire a named lock that will expire automatically after the given amount of time in seconds. You can
+   * Try to acquire a named lock that will expire automatically after the given amount of time in milliseconds. You can
    * release the lock manually with `minion.unlock()` to limit concurrency, or let it expire for rate limiting.
    */
   async lock(name: string, duration: number, options: LockOptions): Promise<boolean> {
