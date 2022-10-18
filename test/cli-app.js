@@ -13,6 +13,7 @@ t.test('Command app', skip, async t => {
   await pg.query`CREATE SCHEMA minion_cli_test`;
 
   const app = mojo();
+  app.log.level = 'info';
   app.plugin(minionPlugin, {config: pg});
 
   const minion = app.models.minion;
@@ -329,6 +330,60 @@ t.test('Command app', skip, async t => {
         ['one:1', 'foo', {bar: 23}],
         ['one:2', 'foo', {bar: 23}]
       ]);
+    });
+
+    await worker.unregister();
+    await worker2.unregister();
+  });
+
+  await app.models.minion.reset({all: true});
+
+  await t.test('minion-worker', async t => {
+    await t.test('Signals', async t => {
+      const id = await minion.enqueue('test');
+
+      const output = await captureOutput(async () => {
+        await app.cli.start(
+          'minion-worker',
+          '--heartbeat-interval',
+          '0',
+          '--jobs',
+          '2',
+          '--spare',
+          '3',
+          '--queue',
+          'important',
+          '--queue',
+          'default',
+          '--dequeue-timeout',
+          '3000',
+          '--command-interval',
+          '5000',
+          '--spare-min-priority',
+          '3'
+        );
+      });
+      t.equal(output.toString(), '');
+
+      const result = await minion.result(id);
+      t.equal(result.state, 'finished');
+
+      t.equal(await minion.workers().total(), 1);
+      const worker = await minion.workers().next();
+      const status = worker.status;
+      t.equal(status.jobs, 2);
+      t.equal(status.spare, 3);
+      t.equal(status.queues[('important', 'default')]);
+      t.equal(status.performed, 1);
+      t.equal(status.dequeueTimeout, 3000);
+      t.equal(status.commandInterval, 5000);
+      t.equal(status.spareMinPriority, 3);
+
+      process.kill(process.pid, 'SIGINT');
+
+      while ((await minion.workers().total()) > 0) {
+        // Just wait for the worker to stop
+      }
     });
   });
 

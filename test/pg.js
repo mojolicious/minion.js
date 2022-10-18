@@ -264,12 +264,12 @@ t.test('PostgreSQL backend', skip, async t => {
     const batch2 = results2.workers;
     t.equal(results2.total, 2);
     t.equal(batch2[0].id, worker2.id);
-    t.same(batch2[0].status, {whatever: 'works!'});
+    t.equal(batch2[0].status.whatever, 'works!');
     t.notOk(batch2[1]);
     worker2.status.whatever = 'works too!';
     await worker2.register();
     const batch3 = (await minion.backend.listWorkers(0, 1)).workers;
-    t.same(batch3[0].status, {whatever: 'works too!'});
+    t.equal(batch3[0].status.whatever, 'works too!');
     const batch4 = (await minion.backend.listWorkers(1, 1)).workers;
     t.equal(batch4[0].id, worker.id);
     t.notOk(batch4[1]);

@@ -15,7 +15,7 @@ declare module '@mojojs/core' {
 }
 
 export function minionPlugin(app: MojoApp, options: PluginOptions): void {
-  app.models.minion = new Minion(options.config, options);
+  app.models.minion = new Minion(options.config, {app, ...options});
 
   app.cli.commandPaths.push(Path.currentFile().sibling('cli').toString());
 

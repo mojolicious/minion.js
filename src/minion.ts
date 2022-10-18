@@ -22,18 +22,21 @@ import {Job} from './job.js';
 import {PgBackend} from './pg-backend.js';
 import {Worker} from './worker.js';
 import mojo from '@mojojs/core';
-import {AbortError} from '@mojojs/util';
+import {AbortError, AsyncHooks} from '@mojojs/util';
 
 export {minionPlugin} from './mojo/plugin.js';
 
 export type {MinionJob, MinionWorker};
 
 export interface MinionOptions {
+  app?: MojoApp;
   backendClass?: any;
   missingAfter?: number;
   removeAfter?: number;
   stuckAfter?: number;
 }
+
+type JobHook = (minion: Minion, job: Job, ...args: any[]) => any;
 
 interface ResultOptions {
   interval?: number;
@@ -47,11 +50,15 @@ export default class Minion {
   /**
    * `@mojojs/core` app this job queue belongs to.
    */
-  app: MojoApp = mojo();
+  app: MojoApp;
   /**
    * Backend, usually a PostgreSQL backend.
    */
   backend: MinionBackend;
+  /**
+   * Job queue hooks.
+   */
+  hooks = new AsyncHooks();
   /**
    * Amount of time in milliseconds after which workers without a heartbeat will be considered missing and removed from
    * the registry by `minion.repair()`, defaults to `1800000` (30 minutes).
@@ -74,11 +81,22 @@ export default class Minion {
   tasks: Record<string, MinionTask> = {};
 
   constructor(config: any, options: MinionOptions = {}) {
+    this.app = options.app ?? mojo();
+
     const backendClass = options.backendClass ?? PgBackend;
     this.backend = new backendClass(this, config);
+
     if (options.missingAfter !== undefined) this.missingAfter = options.missingAfter;
     if (options.removeAfter !== undefined) this.removeAfter = options.removeAfter;
     if (options.stuckAfter !== undefined) this.stuckAfter = options.stuckAfter;
+  }
+
+  /**
+   * Add a hook to extend the job queue.
+   */
+  addJobHook(name: string, fn: JobHook): this {
+    this.hooks.addHook(name, fn);
+    return this;
   }
 
   /**
@@ -136,19 +154,19 @@ export default class Minion {
    * very useful for debugging.
    */
   async foreground(id: number): Promise<boolean> {
-    const job = await this.job(id);
+    let job = await this.job(id);
     if (job === null) return false;
     if ((await job.retry({attempts: 1, queue: 'minion_foreground'})) !== true) return false;
 
     const worker = await this.worker().register();
     try {
-      const job = await worker.dequeue(0, {id, queues: ['minion_foreground']});
+      job = await worker.dequeue(0, {id, queues: ['minion_foreground']});
       if (job === null) return false;
-      const error = await job.execute();
-      if (error === null) {
+      try {
+        await job.execute();
         await job.finish();
         return true;
-      } else {
+      } catch (error: any) {
         await job.fail(error);
         throw error;
       }

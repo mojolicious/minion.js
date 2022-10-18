@@ -54,6 +54,19 @@ export interface MinionStats {
   workers: number;
 }
 
+export interface MinionStatus {
+  commandInterval: number;
+  dequeueTimeout: number;
+  heartbeatInterval: number;
+  jobs: number;
+  performed: number;
+  queues: string[];
+  repairInterval: number;
+  spare: number;
+  spareMinPriority: number;
+  [key: string]: any;
+}
+
 export interface DequeueOptions {
   id?: MinionJobId;
   minPriority?: number;

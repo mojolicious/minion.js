@@ -23,6 +23,7 @@ export class Job {
    */
   task: string;
 
+  _isFinished = false;
   _minion: Minion;
 
   constructor(minion: Minion, id: MinionJobId, args: MinionArgs, retries: number, task: string) {
@@ -41,16 +42,17 @@ export class Job {
   }
 
   /**
-   * Perform job in this process and return `null` if the task was successful or an exception otherwise. Note that
-   * this method should only be used to implement custom workers.
+   * Execute the appropriate task for job in this process. Note that this method should only be used to implement
+   * custom workers.
    */
-  async execute(): Promise<any | null> {
+  async execute(): Promise<void> {
     try {
+      const minion = this.minion;
+      await minion.hooks.runHook('job:before', minion, this);
       const task = this.minion.tasks[this.task];
       await task(this, ...this.args);
-      return null;
-    } catch (error: any) {
-      return error;
+    } finally {
+      this._isFinished = true;
     }
   }
 
@@ -76,6 +78,13 @@ export class Job {
   async info(): Promise<JobInfo | null> {
     const info = (await this.minion.backend.listJobs(0, 1, {ids: [this.id]})).jobs[0];
     return info === null ? null : info;
+  }
+
+  /**
+   * Check if job has been executed in this process.
+   */
+  get isFinished(): boolean {
+    return this._isFinished;
   }
 
   /**
@@ -108,10 +117,10 @@ export class Job {
    * Perform job and wait for it to finish. Note that this method should only be used to implement custom workers.
    */
   async perform(): Promise<void> {
-    const error = await this.execute();
-    if (error === null) {
+    try {
+      await this.execute();
       await this.finish();
-    } else {
+    } catch (error: any) {
       await this.fail(error);
     }
   }
