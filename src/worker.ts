@@ -1,6 +1,5 @@
 import type Minion from './minion.js';
 import type {DequeueOptions, MinionCommand, MinionStatus, WorkerInfo, WorkerOptions} from './types.js';
-import {hrtime} from 'node:process';
 import {Job} from './job.js';
 
 interface JobStatus {
@@ -23,9 +22,9 @@ export class Worker {
 
   _active: JobStatus[] = [];
   _id: number | undefined = undefined;
-  _lastCommand = BigInt(0);
-  _lastHeartbeat = BigInt(0);
-  _lastRepair = BigInt(0);
+  _lastCommand = 0;
+  _lastHeartbeat = 0;
+  _lastRepair = 0;
   _minion: Minion;
   _running = false;
   _stop: Array<() => void> = [];
@@ -188,24 +187,21 @@ export class Worker {
 
   async _maintenance(status: MinionStatus): Promise<void> {
     // Send heartbeats in regular intervals
-    const heartbeatInterval = BigInt(status.heartbeatInterval) * BigInt(1000000);
-    if (this._lastHeartbeat + heartbeatInterval < hrtime.bigint()) {
+    if (this._lastHeartbeat + status.heartbeatInterval < Date.now()) {
       await this.register();
-      this._lastHeartbeat = hrtime.bigint();
+      this._lastHeartbeat = Date.now();
     }
 
     // Process worker remote control commands in regular intervals
-    const commandInterval = BigInt(status.commandInterval) * BigInt(1000000);
-    if (this._lastCommand + commandInterval < hrtime.bigint()) {
+    if (this._lastCommand + status.commandInterval < Date.now()) {
       await this.processCommands();
-      this._lastCommand = hrtime.bigint();
+      this._lastCommand = Date.now();
     }
 
     // Repair in regular intervals (randomize to avoid congestion)
-    const repairInterval = BigInt(status.repairInterval) * BigInt(1000000);
-    if (this._lastRepair + repairInterval < hrtime.bigint()) {
+    if (this._lastRepair + status.repairInterval < Date.now()) {
       await this.minion.repair();
-      this._lastRepair = hrtime.bigint();
+      this._lastRepair = Date.now();
     }
   }
 }

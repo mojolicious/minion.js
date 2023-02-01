@@ -248,9 +248,7 @@ export default class Minion {
   async result(id: MinionJobId, options: ResultOptions = {}): Promise<JobInfo | null> {
     const interval = options.interval ?? 3000;
     const signal = options.signal ?? null;
-    return new Promise((resolve, reject) =>
-      setTimeout(() => this._result(id, interval, signal, resolve, reject), interval)
-    );
+    return new Promise((resolve, reject) => this._result(id, interval, signal, resolve, reject));
   }
 
   /**
