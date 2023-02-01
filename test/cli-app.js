@@ -380,7 +380,12 @@ t.test('Command app', skip, async t => {
       t.equal(status.commandInterval, 5000);
       t.equal(status.spareMinPriority, 3);
 
-      process.kill(process.pid, 'SIGINT');
+      // Windows has no signals
+      if (process.platform === 'win32') {
+        process.emit('SIGINT');
+      } else {
+        process.kill(process.pid, 'SIGINT');
+      }
 
       while ((await minion.workers().total()) > 0) {
         // Just wait for the worker to stop

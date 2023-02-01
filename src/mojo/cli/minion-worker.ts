@@ -46,6 +46,7 @@ export default async function workerCommand(app: MojoApp, args: string[]): Promi
   minion.addJobHook('job:before', (minion, job) => {
     minion.app.log.trace(`Performing job "${job.id}" with task "${job.task}"`);
   });
+
   process.on('SIGINT', () => worker.stop());
 
   await worker.start();
