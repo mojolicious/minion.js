@@ -18,7 +18,9 @@
   },
   "homepage": "https://mojojs.org",
   "scripts": {
+    "bench": "node examples/minion-bench.js",
     "build": "npx tsc --build ./",
+    "build:bench": "npm run build && npm run bench",
     "build:clean": "npm run clean && npm run build",
     "build:coverage": "npm run build && npm run coverage",
     "build:lint": "npm run build && npm run lint",
