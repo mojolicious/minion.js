@@ -2,7 +2,7 @@ import Minion from '../lib/minion.js';
 
 const ENQUEUE = 10000;
 const DEQUEUE = 1000;
-const WORKERS = 3;
+const WORKERS = 4;
 const INFO = 100;
 const STATS = 100;
 
