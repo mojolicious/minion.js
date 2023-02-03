@@ -1,0 +1,59 @@
+% view.layout = 'minion';
+% stash.title = 'Minion - Locks';
+
+%= await ctx.include('minion/_notifications')
+
+<form action="<%= ctx.urlFor('minion_unlock', {query: {_method: 'DELETE'}}) %>" method="POST">
+  <div class="d-flex justify-content-between">
+    <div>
+      <button class="btn btn-outline-secondary" type="submit">
+        <i class="fas fa-lock"></i> Unlock
+      </button>
+    </div>
+    <p class="text-center">
+      % if (locks.length > 0) {
+        <%= offset + 1 %>-<%= offset + locks.length %> of <%= total %>
+      % }
+    </p>
+    %= await ctx.include('minion/_limit')
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><input class="checkall" data-check="name" type="checkbox"></th>
+            <th>Name</th>
+            <th>Expires</th>
+          </tr>
+        </thead>
+        % if (locks.length > 0) {
+          % let num = 0;
+          % for (const lock of locks) {
+            % num++;
+            <tbody>
+              <tr>
+                <td>
+                  <input type="checkbox" name="name" value="<%= lock.name %>">
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {name: lock.name}}) %>">
+                    <%= lock.name %>
+                  </a>
+                </td>
+                <td class="from-now"><%= lock.expires.getTime() / 1000 %></td>
+              </tr>
+            </tbody>
+          % }
+        % } else {
+          <tr><td colspan="3"><p class="text-center"><i class="fas fa-info-circle"></i> No locks found</p></td></tr>
+        % }
+      </table>
+    </div>
+  </div>
+</form>
+
+<div class="d-flex justify-content-center">
+  %= await ctx.include('minion/_pagination')
+</div>

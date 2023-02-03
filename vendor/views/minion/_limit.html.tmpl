@@ -1,0 +1,13 @@
+<nav>
+  <ul class="pagination pull-right">
+    % for (const num of [10, 20, 50, 100]) {
+      % if (limit === num) {
+        <li class="page-item active"><a class="page-link"><%= num %></a></li>
+      % } else {
+        <li class="page-item">
+          <a class="page-link" href="<%= ctx.urlWith('current', {query: {limit: num}}) %>"><%= num %></a>
+        </li>
+      % }
+    % }
+  </ul>
+</nav>

@@ -135,7 +135,7 @@ export class Job {
   /**
    * Transition job back to `inactive` state, already `inactive` jobs may also be retried to change options.
    */
-  async retry(options: RetryOptions) {
+  async retry(options: RetryOptions = {}) {
     return await this.minion.backend.retryJob(this.id, this.retries, options);
   }
 

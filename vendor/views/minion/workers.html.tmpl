@@ -1,0 +1,91 @@
+% view.layout = 'minion';
+% stash.title = 'Minion - Workers';
+
+<{relatedBlock(worker)}>
+  % const {jobs} = worker;
+  % if (jobs.length > 0) {
+    <div class="dropdown">
+      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" id="dropdownMenuButton"
+        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        Related
+      </button>
+      <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        <a class="dropdown-item" href="<%= ctx.urlFor('minion_jobs', {query: {id: jobs}}) %>">
+          <i class="fas fa-cubes"></i> Jobs
+        </a>
+      </div>
+    </div
+  % }
+<{/relatedBlock}>
+
+<div class="d-flex justify-content-between">
+  <div></div>
+  <div>
+    <p class="text-center">
+      % if (workers.length > 0) {
+        <%= offset + 1 %>-<%= offset + workers.length %> of <%= total %>
+      % }
+    </p>
+  </div>
+  %= await ctx.include('minion/_limit')
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Worker ID</th>
+          <th>Host</th>
+          <th>Process ID</th>
+          <th>Started</th>
+          <th></th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      % if (workers.length > 0) {
+        % let num = 0;
+        % for (const worker of workers) {
+          % num++;
+          <tbody>
+            <tr>
+              <td>
+                <a href="<%= ctx.urlFor('current', {query: {id: worker.id}}) %>">
+                  <%= worker.id %>
+                </a>
+              </td>
+              <td><%= worker.host %></td>
+              <td><%= worker.pid %></td>
+              <td class="from-now"><%= worker.started %></td>
+              <td><%= await relatedBlock(worker) %></td>
+              <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#worker<%= num %>">
+                % if (worker.jobs.length > 0) {
+                  <span class="badge badge-primary">busy</span>
+                % } else {
+                  <span class="badge badge-secondary">idle</span>
+                % }
+              </td>
+              <td class="accordion-toggle collapsed expand" data-toggle="collapse" data-target="#worker<%= num %>">
+                <span class="fas fa-lg expand-icon"></span>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="7" class="hiddenRow">
+                <div class="collapse" id="worker<%= num %>">
+                  <pre class="border rounded"><%= ctx.yamlDump(worker) %></pre>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        % }
+      % } else {
+        <tr><td colspan="4"><p class="text-center"><i class="fas fa-info-circle"></i> No workers found</p></td></tr>
+      % }
+    </table>
+  </div>
+</div>
+
+<div class="d-flex justify-content-center">
+  %= await ctx.include('minion/_pagination')
+</div>

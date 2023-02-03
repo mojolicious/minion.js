@@ -1,0 +1,157 @@
+<!doctype html><html>
+  <head>
+    <title><%= stash.title ?? 'Minion' %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    %= ctx.scriptTag('/minion/jquery/jquery.js')
+    %= ctx.scriptTag('/minion/bootstrap/bootstrap.js')
+    %= ctx.styleTag('/minion/bootstrap/bootstrap.css')
+    %= ctx.scriptTag('/minion/moment/moment.js')
+    %= ctx.scriptTag('/minion/d3/d3.js')
+    %= ctx.scriptTag('/minion/epoch/epoch.js')
+    %= ctx.styleTag('/minion/epoch/epoch.css')
+    %= ctx.styleTag('/minion/fontawesome/fontawesome.css')
+    %= ctx.styleTag('/minion/app.css')
+    %= ctx.scriptTag('/minion/app.js')
+    <script>
+      $(() => {
+        checkAll();
+        humanTime();
+        pollStats('<%= ctx.urlFor('minion_stats') %>');
+      });
+    </script>
+    %= ctx.content.head
+  </head>
+  <body class="d-flex flex-column h-100">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3 border-bottom">
+      <div class="container">
+        <a href="<%= ctx.urlFor('minion_dashboard') %>" class="navbar-brand">
+          <picture>
+            <img src="<%= ctx.urlForFile('/minion/logo-black.png') %>"
+              srcset="<%= ctx.urlForFile('/minion/logo-black-2x.png') %> 2x">
+          </picture>
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+          aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_jobs', {query: {state: 'inactive'}}) %>">
+                Inactive <span class="badge badge-pill badge-secondary minion-stats-inactive-jobs">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_jobs', {query: {state: 'active'}}) %>">
+                Active <span class="badge badge-pill badge-primary minion-stats-active-jobs">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_jobs', {query: {state: 'finished'}}) %>">
+                Finished <span class="badge badge-pill badge-success minion-stats-finished-jobs">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_jobs', {query: {state: 'failed'}}) %>">
+                Failed <span class="badge badge-pill badge-danger minion-stats-failed-jobs">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_locks') %>">
+                Locks <span class="badge badge-pill badge-secondary minion-stats-active-locks">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor('minion_workers') %>">
+                Workers <span class="badge badge-pill badge-secondary minion-stats-workers">0</span>
+              </a>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#searchModal" data-toggle="modal" data-target="#searchModal">
+                <i class="fas fa-search"></i> Search
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="<%= ctx.urlFor(returnTo) %>">
+                <i class="fas fa-sign-out-alt" aria-hidden="true"></i> Back to Site
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <div class="container flex-grow-1">
+      <div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <form action="<%= ctx.urlFor('minion_jobs') %>">
+              <div class="modal-header">
+                <h5 class="modal-title" id="searchModalLabel">Search jobs</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="state">Task</label>
+                  <select class="custom-select" id="state" name="task">
+                    <option selected></option>
+                    % for (const task of Object.keys(ctx.models.minion.tasks)) {
+                      <option><%= task %></option>
+                    % }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="state">State</label>
+                  <select class="custom-select" id="state" name="state">
+                    <option selected></option>
+                    <option>inactive</option>
+                    <option>active</option>
+                    <option>finished</option>
+                    <option>failed</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="queue">Queue</label>
+                  <input type="text" class="form-control" id="queue" name="queue">
+                </div>
+                <div class="form-group">
+                  <label for="note">Note</label>
+                  <input type="text" class="form-control" id="note" name="note">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary">Search</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      %== ctx.content.main
+    </div>
+    <footer>
+      <div class="container-fluid p-3 mojo-footer">
+        <div class="container">
+          <div class="row">
+            <div class="col-sm align-self-center text-center">
+              <b>Free</b> and <b>Open Source</b>.
+            </div>
+            <div class="col-sm align-self-center text-center mojo-copy">
+                <i class="far fa-copyright"></i> 2023 Sebastian Riedel and the
+                <a href="https://github.com/mojolicious/minion.js/blob/main/AUTHORS">Minion contributors</a>.
+            </div>
+            <div class="col-sm align-self-center text-center mojo-social">
+              <a alt="GitHub" href="https://github.com/mojolicious/minion"><i class="fab fa-github-alt"></i></a>
+              <a alt="Mastodon" href="https://fosstodon.org/@mojolicious"><i class="fab fa-mastodon"></i></a>
+              <a alt="LinkedIn" href="https://www.linkedin.com/groups/8963713/"><i class="fab fa-linkedin"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

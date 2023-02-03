@@ -1,0 +1,169 @@
+% view.layout = 'minion';
+% stash.title = 'Minion - Jobs';
+
+<{relatedBlock(job)}>
+  % const {parents, children, worker} = job;
+  % if (parents.length > 0 || children.length > 0 || worker != null) {
+    <div class="dropdown">
+      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" id="dropdownMenuButton"
+        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        Related
+      </button>
+      <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        % if (parents.length > 0) {
+          % const url = ctx.urlFor('minion_jobs', {query: {id: parents}});
+          <a class="dropdown-item" href="<%= url %>"><i class="far fa-arrow-alt-circle-left"></i> Parents</a>
+        % }
+        % if (children.length > 0) {
+          % const url = ctx.urlFor('minion_jobs', {query: {id: children}});
+          <a class="dropdown-item" href="<%= url %>"><i class="far fa-arrow-alt-circle-right"></i> Children</a>
+        % }
+        % if (worker != null) {
+          % const url = ctx.urlFor('minion_workers', {query: {id: worker}});
+          <a class="dropdown-item" href="<%= url %>"><i class="fas fa-hard-hat"></i> Worker</a>
+        % }
+      </div>
+    </div>
+  % }
+<{/relatedBlock}>
+
+%= await ctx.include('minion/_notifications')
+
+<form action="<%= ctx.urlFor('minion_manage_jobs', {query: {_method: 'PATCH'}}) %>" method="POST">
+  <div class="d-flex justify-content-between">
+    <div>
+      <div class="btn-group" role="group">
+        <button class="btn btn-outline-secondary" name="do" value="retry" type="submit">
+          <i class="fas fa-redo" aria-hidden="true"></i> Retry
+        </button>
+        <button class="btn btn-outline-secondary" name="do" value="stop" type="submit">
+          <i class="fas fa-ban" aria-hidden="true"></i> Stop
+        </button>
+        <button class="btn btn-outline-secondary" name="do" value="remove" type="submit">
+          <i class="fas fa-times" aria-hidden="true"></i> Remove
+        </button>
+        <div class="btn-group" role="group">
+          <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenu2"
+            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <i class="fas fa-traffic-light"></i> Signal
+          </button>
+          <div class="dropdown-menu" aria-labelledby="dropdownMenu2">
+            <button class="dropdown-item" name="do" value="sig_int" type="submit">
+              INT
+            </button>
+            <button class="dropdown-item" name="do" value="sig_term" type="submit">
+              TERM
+            </button>
+            <button class="dropdown-item" name="do" value="sig_usr1" type="submit">
+              USR1
+            </button>
+            <button class="dropdown-item" name="do" value="sig_usr2" type="submit">
+              USR2
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="align-middle">
+      % if (jobs.length > 0) {
+        <%= offset + 1 %>-<%= offset + jobs.length %> of <%= total %>
+      % }
+    </p>
+    %= await ctx.include('minion/_limit')
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><input class="checkall" data-check="id" type="checkbox"></th>
+            <th>Job ID</th>
+            <th>Task</th>
+            <th>Queue</th>
+            <th>Created</th>
+            <th></th>
+            <th></th>
+            <th>Runtime</th>
+            <th></th>
+          </tr>
+        </thead>
+        % if (jobs.length > 0) {
+          % let num = 0;
+          % for (const job of jobs) {
+            % num++;
+            <tbody>
+              <tr>
+                <td>
+                  <input type="checkbox" name="id" value="<%= job.id %>">
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {id: job.id}}) %>">
+                    <%= job.id %>
+                  </a>
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {offset: 0, task: job.task}}) %>">
+                    <%= job.task %>
+                  </a>
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {offset: 0, queue: job.queue}}) %>">
+                    <%= job.queue %>
+                  </a>
+                </td>
+                <td class="from-now"><%= job.created.getTime() / 1000 %></td>
+                <td><%= await relatedBlock(job) %></td>
+                <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#job<%= num %>">
+                  % if (job.state === 'active') {
+                    <span class="badge badge-primary">active</span>
+                  % } else if (job.state === 'failed') {
+                    <span class="badge badge-danger">failed</span>
+                  % } else if (job.state === 'finished') {
+                    <span class="badge badge-success">finished</span>
+                  % } else {
+                    <span class="badge badge-secondary">inactive</span>
+                  % }
+                </td>
+                % if (job.state === 'active' || job.state === 'finished' || job.state === 'failed') {
+                  % const end = job.state === 'active' ? 'time' : 'finished';
+                  % const runtime = job[end] - job.started;
+                  <td class="accordion-toggle collapsed duration" data-toggle="collapse" data-target="#job<%= num %>">
+                    <%= runtime %>
+                  </td>
+                % } else if (job.delayed > job.time) {
+                  <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#job<%= num %>">
+                    <div class="d-inline duration">
+                      <%= (job.delayed - job.time).getTime() / 1000 %>
+                    </div>
+                    delay
+                  </td>
+                % } else {
+                  <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#job<%= num %>">
+                    waiting
+                  </td>
+                % }
+                <td class="accordion-toggle collapsed expand" data-toggle="collapse" data-target="#job<%= num %>">
+                  <span class="fas fa-lg expand-icon"></span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="9" class="hiddenRow">
+                  <div class="collapse" id="job<%= num %>">
+                    <pre class="border rounded"><%= ctx.yamlDump(job) %></pre>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          % }
+        % } else {
+          <tr><td colspan="9"><p class="text-center"><i class="fas fa-info-circle"></i> No jobs found</p></td></tr>
+        % }
+      </table>
+    </div>
+  </div>
+</form>
+
+<div class="d-flex justify-content-center">
+  %= await ctx.include('minion/_pagination')
+</div>

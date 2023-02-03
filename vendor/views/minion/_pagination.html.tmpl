@@ -1,0 +1,57 @@
+% const lastPage = Math.ceil(total / limit);
+% const currentPage = Math.round(offset / limit) + 1;
+% const prevOffset  = (offset - limit) < 0 ? 0 : offset - limit;
+% const nextOffset  = offset + limit;
+% const lastOffset  = (lastPage - 1) * limit;
+
+<nav class="text-center">
+  <ul class="pagination">
+    % if (currentPage === 1) {
+      <li class="page-item disabled">
+        <a class="page-link">First</a>
+    % } else {
+      <li class="page-item">
+        <a class="page-link" href="<%= ctx.urlWith('current', {query: {offset: 0}}) %>">First</a>
+    % }
+    </li>
+    % if (currentPage === 1) {
+      <li class="page-item disabled">
+        <a class="page-link">Previous</a>
+    % } else {
+      <li class="page-item">
+        <a class="page-link" href="<%= ctx.urlWith('current', {query: {offset: prevOffset}}) %>">Previous</a>
+    % }
+    </li>
+    % let start = currentPage >= 3 ? currentPage - 2 : 1;
+    % start = start >= (lastPage - 4) ? lastPage - 4 : start;
+    % if (start < 1) start = 1;
+    % const end = lastPage < (start + 4) ? lastPage : start + 4;
+    % for (let num = start; num <= end; num++) {
+      % if (num === currentPage) {
+        <li class="page-item active"><a class="page-link"><%= num %></a></li>
+      % } else {
+        <li class="page-item">
+          <a class="page-link" href="<%= ctx.urlWith('current', {query: {offset: (num - 1) * limit}}) %>">
+            <%= num %>
+          </a>
+        </li>
+      % }
+    % }
+    % if (currentPage >= lastPage) {
+      <li class="page-item disabled">
+        <a class="page-link">Next</a>
+    % } else {
+      <li class="page-item">
+        <a class="page-link" href="<%= ctx.urlWith('current', {query: {offset: nextOffset}}) %>">Next</a>
+    % }
+    </li>
+    % if (currentPage >= lastPage) {
+      <li class="page-item disabled">
+        <a class="page-link">Last</a>
+    % } else {
+      <li class="page-item">
+        <a class="page-link" href="<%= ctx.urlWith('current', {query: {offset: lastOffset}}) %>">Last</a>
+    % }
+    </li>
+  </ul>
+</nav>

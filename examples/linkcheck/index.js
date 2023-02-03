@@ -1,10 +1,12 @@
 import {checkLinksTask} from './tasks/check-links.js';
-import {minionPlugin} from '@minionjs/core';
+//import {minionPlugin, minionAdminPlugin} from '@minionjs/core';
+import {minionPlugin, minionAdminPlugin} from '../../lib/minion.js';
 import mojo, {yamlConfigPlugin} from '@mojojs/core';
 import Pg from '@mojojs/pg';
 
 export const app = mojo();
 app.plugin(yamlConfigPlugin);
+app.plugin(minionAdminPlugin);
 app.secrets = app.config.secrets;
 
 app.addAppHook('app:start', async app => {

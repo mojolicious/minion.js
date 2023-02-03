@@ -1,0 +1,29 @@
+<div class="row">
+  <div class="col-md-12 align-middle">
+    % const flash = await ctx.flash();
+    % if (flash.info !== undefined) {
+      <div class="alert alert-dismissible alert-info" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <%= flash.info %>
+      </div>
+    % }
+    % if (flash.success !== undefined) {
+      <div class="alert alert-dismissible alert-success" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <%= flash.success %>
+      </div>
+    % }
+    % if (flash.danger !== undefined) {
+      <div class="alert alert-dismissible alert-danger" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <%= flash.danger %>
+      </div>
+    % }
+  </div>
+</div>

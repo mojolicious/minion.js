@@ -22,9 +22,15 @@ import {Job} from './job.js';
 import {PgBackend} from './pg-backend.js';
 import {Worker} from './worker.js';
 import mojo from '@mojojs/core';
+import Path from '@mojojs/path';
 import {AbortError, AsyncHooks} from '@mojojs/util';
 
 export {minionPlugin} from './mojo/plugin.js';
+export {minionAdminPlugin} from './mojo/admin-plugin.js';
+
+export const version = JSON.parse(
+  Path.currentFile().dirname().sibling('package.json').readFileSync().toString()
+).version;
 
 export type {MinionJob, MinionWorker};
 
@@ -208,7 +214,7 @@ export default class Minion {
    * Try to acquire a named lock that will expire automatically after the given amount of time in milliseconds. You can
    * release the lock manually with `minion.unlock()` to limit concurrency, or let it expire for rate limiting.
    */
-  async lock(name: string, duration: number, options: LockOptions): Promise<boolean> {
+  async lock(name: string, duration: number, options?: LockOptions): Promise<boolean> {
     return await this.backend.lock(name, duration, options);
   }
 

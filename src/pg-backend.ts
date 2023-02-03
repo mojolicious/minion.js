@@ -83,7 +83,7 @@ export class PgBackend {
   /**
    * Backend name.
    */
-  name = 'Pg (Node.js)';
+  name = 'Pg';
   /**
    * Minion instance this backend belongs to.
    */
