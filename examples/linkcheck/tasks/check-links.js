@@ -1,5 +1,5 @@
 export function checkLinksTask(app) {
-  app.models.minion.addTask('checkLinks', checkLinks);
+  app.models.minion.addTask('check_links', checkLinks);
 }
 
 async function checkLinks(job, url) {

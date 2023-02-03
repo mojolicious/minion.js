@@ -57,7 +57,7 @@
               </td>
               <td><%= worker.host %></td>
               <td><%= worker.pid %></td>
-              <td class="from-now"><%= worker.started %></td>
+              <td class="from-now"><%= worker.started.getTime() / 1000 %></td>
               <td><%= await relatedBlock(worker) %></td>
               <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#worker<%= num %>">
                 % if (worker.jobs.length > 0) {

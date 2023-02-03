@@ -1,7 +1,7 @@
 export default class PostsController {
   async check(ctx) {
     const params = await ctx.params();
-    const id = await ctx.models.minion.enqueue('checkLinks', [params.get('url')]);
+    const id = await ctx.models.minion.enqueue('check_links', [params.get('url')]);
     await ctx.redirectTo('result', {values: {id}});
   }
 
