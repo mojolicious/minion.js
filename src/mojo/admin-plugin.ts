@@ -63,16 +63,11 @@ async function listJobs(ctx: MojoContext): Promise<any> {
   const offset = parseInt(params.get('offset') ?? '0');
 
   const options: ListJobsOptions = {};
-  const ids = params.getAll('id').map(id => parseInt(id));
-  if (ids.length > 0) options.ids = ids;
-  const notes = params.getAll('note');
-  if (notes.length > 0) options.notes = notes;
-  const queues = params.getAll('queue');
-  if (queues.length > 0) options.queues = queues;
-  const states = params.getAll('state') as MinionStates[];
-  if (states.length > 0) options.states = states;
-  const tasks = params.getAll('task');
-  if (tasks.length > 0) options.tasks = tasks;
+  if (params.has('id') === true) options.ids = params.getAll('id').map(id => parseInt(id));
+  if (params.has('note') === true) options.notes = params.getAll('note');
+  if (params.has('queue') === true) options.queues = params.getAll('queue');
+  if (params.has('state') === true) options.states = params.getAll('state') as MinionStates[];
+  if (params.has('task') === true) options.tasks = params.getAll('task');
 
   const results = await ctx.models.minion.backend.listJobs(offset, limit, options);
   await ctx.render({view: 'minion/jobs'}, {jobs: results.jobs, total: results.total, limit, offset});
@@ -96,8 +91,7 @@ async function listLocks(ctx: MojoContext): Promise<any> {
   const offset = parseInt(params.get('offset') ?? '0');
 
   const options: ListLocksOptions = {};
-  const names = params.getAll('name');
-  if (names.length > 0) options.names = names;
+  if (params.has('name')) options.names = params.getAll('name');
 
   const results = await ctx.models.minion.backend.listLocks(offset, limit, options);
   await ctx.render({view: 'minion/locks'}, {locks: results.locks, total: results.total, limit, offset});
@@ -121,8 +115,7 @@ async function listWorkers(ctx: MojoContext): Promise<any> {
   const offset = parseInt(params.get('offset') ?? '0');
 
   const options: ListWorkersOptions = {};
-  const ids = params.getAll('id').map(id => parseInt(id));
-  if (ids.length > 0) options.ids = ids;
+  if (params.has('id')) options.ids = params.getAll('id').map(id => parseInt(id));
 
   const results = await ctx.models.minion.backend.listWorkers(offset, limit, options);
   await ctx.render({view: 'minion/workers'}, {workers: results.workers, total: results.total, limit, offset});
