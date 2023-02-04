@@ -373,6 +373,7 @@ t.test('Command app', skip, async t => {
       const status = worker.status;
       t.equal(status.jobs, 2);
       t.equal(status.spare, 3);
+      t.equal(status.type, 'Node.js');
       t.equal(status.queues[('important', 'default')]);
       t.ok(status.performed >= 0);
       t.equal(status.dequeueTimeout, 3000);

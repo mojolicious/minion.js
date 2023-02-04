@@ -41,6 +41,7 @@ export class Worker {
       repairInterval: 21600000,
       spare: 1,
       spareMinPriority: 1,
+      type: 'Node.js',
       ...options.status
     });
     status.repairInterval -= Math.ceil(Math.random() * (status.repairInterval / 2));
