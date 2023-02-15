@@ -9,7 +9,7 @@ app.plugin(yamlConfigPlugin);
 app.plugin(minionAdminPlugin);
 app.secrets = app.config.secrets;
 
-app.addAppHook('app:start', async app => {
+app.onStart(async app => {
   if (app.models.pg === undefined) app.models.pg = new Pg(app.config.pg);
   app.plugin(minionPlugin, {config: app.models.pg});
   app.plugin(checkLinksTask);

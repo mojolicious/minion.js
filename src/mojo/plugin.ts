@@ -20,7 +20,7 @@ export function minionPlugin(app: MojoApp, options: PluginOptions): void {
   app.cli.commandPaths.push(Path.currentFile().sibling('cli').toString());
 
   if (options.autoUpdate ?? true === true) {
-    app.addAppHook('app:start', async app => {
+    app.onStart(async app => {
       await app.models.minion.update();
     });
   }
