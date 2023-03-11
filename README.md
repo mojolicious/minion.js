@@ -13,10 +13,6 @@ job dependencies, job progress, job results, retries with backoff, rate limiting
 statistics, distributed workers, parallel processing, remote control, [mojo.js](https://mojojs.org) admin ui and
 multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
 
-Job queues allow you to process time and/or computationally intensive tasks in background processes, outside of the
-request/response lifecycle of web applications. Among those tasks you'll commonly find image resizing, spam filtering,
-HTTP downloads, building tarballs, warming caches and basically everything else you can imagine that's not super fast.
-
 ```js
 import Minion from '@minionjs/core';
 
@@ -45,10 +41,73 @@ worker.status.jobs = 12;
 await worker.start();
 ```
 
-## Documentation
+## Job Queue
 
-TODO: While minion.js itself is pretty much feature complete, the documentation still needs to be added for the 1.0
-release.
+Job queues allow you to process time and/or computationally intensive tasks in background processes, outside of the
+request/response lifecycle of web applications. Among those tasks you'll commonly find image resizing, spam filtering,
+HTTP downloads, building tarballs, warming caches and basically everything else you can imagine that's not super fast.
+
+```
+Web Applications                      +--------------+                     Minion
+|- Node.js [1]       enqueue job ->   |              |   -> dequeue job    |- Worker [1]
+|- Node.js [2]                        |  PostgreSQL  |                     |- Worker [2]
+|- Node.js [3]   retrieve result <-   |              |   <- store result   |- Worker [3]
++- Node.js [4]                        +--------------+                     |- Worker [4]
+                                                                           +- Worker [5]
+```
+
+They are not to be confused with time based job schedulers, such as cron or systemd timers. Both serve very different
+purposes, and cron jobs are in fact commonly used to enqueue Minion jobs that need to follow a schedule. For example
+to perform regular maintenance tasks.
+
+## Consistency
+
+Every new job starts out as `inactive`, then progresses to `active` when it is dequeued by a worker, and finally ends
+up as `finished` or `failed`, depending on its result. Every `failed` job can then be retried to progress back to the
+`inactive` state and start all over again.
+
+```
+                                                  +----------+
+                                                  |          |
+                                          +----->  | finished |
++----------+            +--------+        |        |          |
+|          |            |        |        |        +----------+
+| inactive |  ------->  | active |  ------+
+|          |            |        |        |        +----------+
++----------+            +--------+        |        |          |
+                                          +----->  |  failed  |  -----+
+    ^                                             |          |       |
+    |                                             +----------+       |
+    |                                                                |
+    +----------------------------------------------------------------+
+```
+
+The system is eventually consistent and will preserve job results for as long as you like, depending on the value of
+the `minion.removeAfter` property. But be aware that `failed` results are preserved indefinitely, and need to be
+manually removed by an administrator if they are out of automatic retries.
+
+While individual workers can fail in the middle of processing a job, the system will detect this and ensure that no job
+is left in an uncertain state, depending on the value of the `minion.missingAfter` property. Jobs that do not get
+processed after a certain amount of time, will be considered stuck and fail automatically, depending on the value of
+the `minion.stuckAfter` property. So an admin can take a look and resolve the issue.
+
+## Deployment
+
+To manage background worker processes with systemd, you can use a unit configuration file like this.
+
+```
+[Unit]
+Description=My Mojolicious application workers
+After=postgresql.service
+
+[Service]
+Type=simple
+ExecStart=/home/sri/myapp/myapp.pl minion worker -m production
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ## Installation
 
