@@ -91,7 +91,7 @@ is left in an uncertain state, depending on the value of the `minion.missingAfte
 processed after a certain amount of time, will be considered stuck and fail automatically, depending on the value of
 the `minion.stuckAfter` property. So an admin can take a look and resolve the issue.
 
-## Enqueue Options
+### Enqueue Options
 
 New jobs are created with the `minion.enqueue()` method, which requires a task name to tell the worker what kind of
 workload the job represents, an array with job arguments, and an object with optional features to use for processing
