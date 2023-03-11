@@ -41,7 +41,7 @@ worker.status.jobs = 12;
 await worker.start();
 ```
 
-## Job Queue
+### Job Queue
 
 Job queues allow you to process time and/or computationally intensive tasks in background processes, outside of the
 request/response lifecycle of web applications. Among those tasks you'll commonly find image resizing, spam filtering,
@@ -60,15 +60,15 @@ They are not to be confused with time based job schedulers, such as cron or syst
 purposes, and cron jobs are in fact commonly used to enqueue Minion jobs that need to follow a schedule. For example
 to perform regular maintenance tasks.
 
-## Consistency
+### Consistency
 
 Every new job starts out as `inactive`, then progresses to `active` when it is dequeued by a worker, and finally ends
 up as `finished` or `failed`, depending on its result. Every `failed` job can then be retried to progress back to the
 `inactive` state and start all over again.
 
 ```
-                                                  +----------+
-                                                  |          |
+                                                   +----------+
+                                                   |          |
                                           +----->  | finished |
 +----------+            +--------+        |        |          |
 |          |            |        |        |        +----------+
@@ -76,10 +76,10 @@ up as `finished` or `failed`, depending on its result. Every `failed` job can th
 |          |            |        |        |        +----------+
 +----------+            +--------+        |        |          |
                                           +----->  |  failed  |  -----+
-    ^                                             |          |       |
-    |                                             +----------+       |
-    |                                                                |
-    +----------------------------------------------------------------+
+     ^                                             |          |       |
+     |                                             +----------+       |
+     |                                                                |
+     +----------------------------------------------------------------+
 ```
 
 The system is eventually consistent and will preserve job results for as long as you like, depending on the value of
@@ -90,6 +90,43 @@ While individual workers can fail in the middle of processing a job, the system 
 is left in an uncertain state, depending on the value of the `minion.missingAfter` property. Jobs that do not get
 processed after a certain amount of time, will be considered stuck and fail automatically, depending on the value of
 the `minion.stuckAfter` property. So an admin can take a look and resolve the issue.
+
+## Enqueue Options
+
+New jobs are created with the `minion.enqueue()` method, which requires a task name to tell the worker what kind of
+workload the job represents, an array with job arguments, and an object with optional features to use for processing
+this job.
+
+```js
+await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
+
+  // Number of times performing this job will be attempted (defaults to 0), with a computed increasing delay
+  attempts: 5,
+
+  // Delay job for this many milliseconds (from now)
+  delay: 5000,
+
+  // Job is valid for this many milliseconds (from now) before it expires
+  expire: 10000,
+
+  // Existing jobs this job depends on may also have transitioned to the "failed" state to allow for it to be processed
+  lax: true,
+
+  // Object with arbitrary metadata for this job that gets serialized as JSON
+  notes: {foo: 'bar'},
+
+  // One or more existing jobs this job depends on, and that need to have transitioned to the state "finished" before
+  // it can be processed
+  parents: [23, 24, 25],
+
+  // Job priority (defaults to 0), jobs with a higher priority get performed first, priorities can be positive or
+  // negative, but should be in the range between 100 and -100
+  priority: 9,
+
+  // Queue to put job in (defaults to "default")
+  queue: 'important'
+});
+```
 
 ## Deployment
 
