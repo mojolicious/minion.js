@@ -213,6 +213,7 @@ not stop processing.
 
 ```js
 const success = await job.retry({
+
   // Number of times performing this job will be attempted
   attempts: 3,
 
