@@ -154,7 +154,7 @@ minion.addTask('somethingSlow', async job => {
   console.log('This is a background worker process.');
 });
 
-// Task without result
+// Task with result
 minion.addTask('somethingWithResult', async (job, num1, num2) => {
   const rersult = num1 + num2;
   await job.finish(result);
