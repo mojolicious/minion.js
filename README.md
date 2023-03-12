@@ -93,7 +93,7 @@ the `minion.stuckAfter` property. So an admin can take a look and resolve the is
 
 ## API
 
-Minion.js uses a PostgreSQL backend by default, but the `backendClass` option can be used for alternative database
+Minion uses a PostgreSQL backend by default, but the `backendClass` option can be used for alternative database
 backends. The Perl version also supports SQLite and MySQL for example. See the
 [PgBackend](https://github.com/mojolicious/minion.js/blob/main/src/pg-backend.ts) class for inspiration.
 
@@ -104,6 +104,8 @@ const minion = new Minion('postgres://user:password@localhost:5432/database');
 // Custom 3rd party backend
 const minion = new Minion('sqlite:test.db', {backendClass: SQLiteBackend});
 ```
+
+### Enqueue
 
 New jobs are created with the `minion.enqueue()` method, which requires a task name to tell the worker what kind of
 workload the job represents, an array with job arguments, and an object with optional features to use for processing
@@ -140,9 +142,11 @@ const jobId = await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
 });
 ```
 
-Tasks are created with `minion.addTask()`, and represent the individual workloads that workers can perform. Not all
-workers need to have the same tasks, but it is recommended for easier to maintain code. If you want to route individual
-jobs to certain workers, it is better to use named queues for that than tasks.
+### Tasks
+
+Tasks are created with `minion.addTask()`, and are async functions that represent the individual workloads workers can
+perform. Not all workers need to have the same tasks, but it is recommended for easier to maintain code. If you want to
+route individual jobs to certain workers, it is better to use named queues for that.
 
 ```js
 // Task without result
@@ -154,6 +158,79 @@ minion.addTask('somethingSlow', async job => {
 minion.addTask('somethingWithResult', async (job, num1, num2) => {
   const rersult = num1 + num2;
   await job.finish(result);
+});
+```
+
+### Jobs
+
+Individual jobs are represented as instances of the `Job` class, which are the first argument passed to all task
+functions. To check the current status of a specific job, you can use the `minion.job()` method.
+
+```js
+// Request a specific job (this does not prevent workers from processing the job)
+const job = await minion.job(23);
+
+// Job properties
+const jobId   = job.id;
+const task    = job.task;
+const args    = job.args;
+const retries = job.retries;
+
+// Request current state of the job
+const info     = await job.info();
+const attempts = info.attempts;
+const children = info.children;
+const created  = info.created;
+const delayed  = info.delayed;
+const expires  = info.expires;
+const finished = info.finished;
+const lax      = info.lax;
+const notes    = info.notes;
+const parents  = info.parents;
+const priority = info.priority;
+const queue    = info.queue;
+const result   = info.result;
+const retried  = info.retried;
+const started  = info.started;
+const state    = info.state;
+const time     = info.time;
+const worker   = info.worker;
+
+// Merge notes (remove a note by setting it to "null")
+const success = await job.note({just: 'a note', another: ['note'], foo: null});
+
+// Remove job from database
+const success = await job.remove();
+```
+
+Every job still in the database can be retried at any time, this is the only way to change many of the available
+processing options. A worker already processing this job will not be able to assign a result afterwards, but it will
+not stop processing.
+
+```js
+const success = await job.retry({
+  // Number of times performing this job will be attempted
+  attempts: 3,
+
+  // Delay job for this many milliseconds (from now)
+  delay: 3000,
+
+  // Job is valid for this many milliseconds (from now) before it expires
+  expire: 5000,
+
+  // Existing jobs this job depends on may also have transitioned to the "failed" state to allow for it to be processed
+  lax: false,
+
+  // One or more existing jobs this job depends on, and that need to have transitioned to the state "finished" before
+  // it can be processed
+  parents: [23, 25],
+
+  // Job priority (defaults to 0), jobs with a higher priority get performed first, priorities can be positive or
+  // negative, but should be in the range between 100 and -100
+  priority: 5,
+
+  // Queue to put job in
+  queue: 'unimportant'
 });
 ```
 
