@@ -320,8 +320,10 @@ import mojo from '@mojojs/core';
 
 export const app = mojo();
 
+const minionPrefix = app.any('/minion');
+
 app.plugin(minionPlugin, {config: 'postgres://user:password@localhost:5432/database'});
-app.plugin(minionAdminPlugin);
+app.plugin(minionAdminPlugin, {route: minionPrefix});
 
 app.start();
 ```
