@@ -109,7 +109,7 @@ const minion = new Minion('sqlite:test.db', {backendClass: SQLiteBackend});
 
 New jobs are created with the `minion.enqueue()` method, which requires a task name to tell the worker what kind of
 workload the job represents, an array with job arguments, and an object with optional features to use for processing
-this job. Every created job has a unique id that can be used to check the current status or request its result.
+this job. Every newly created job has a unique id that can be used to check its current status.
 
 ```js
 const jobId = await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
@@ -201,6 +201,10 @@ const success = await job.note({just: 'a note', another: ['note'], foo: null});
 
 // Remove job from database
 const success = await job.remove();
+
+// Manually finish/fail the job (the result is an arbitrary data structure that will be serialized as JSON)
+const success = await job.finish('Huge success!');
+const success = await job.fail('Something went wrong!');
 ```
 
 Every job still in the database can be retried at any time, this is the only way to change many of the available
