@@ -93,9 +93,9 @@ the `minion.stuckAfter` property. So an admin can take a look and resolve the is
 
 ## API
 
-Minion uses a PostgreSQL backend by default, but the `backendClass` option can be used for alternative database
-backends. The Perl version also supports SQLite and MySQL for example. See the
-[PgBackend](https://github.com/mojolicious/minion.js/blob/main/src/pg-backend.ts) class for inspiration.
+Minion uses a PostgreSQL backend by default, but allows for 3rd party implementations of alternative backends. See the
+[PgBackend](https://github.com/mojolicious/minion.js/blob/main/src/pg-backend.ts) class and its
+[tests](https://github.com/mojolicious/minion.js/blob/main/test/pg.js) for inspiration.
 
 ```js
 // Default PostgreSQL backend
@@ -146,7 +146,7 @@ const jobId = await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
 
 Tasks are created with `minion.addTask()`, and are async functions that represent the individual workloads workers can
 perform. Not all workers need to have the same tasks, but it is recommended for easier to maintain code. If you want to
-route individual jobs to certain workers, it is better to use named queues for that.
+route individual jobs to specific workers it is better to use named queues for that.
 
 ```js
 // Task without result
