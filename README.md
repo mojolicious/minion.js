@@ -164,7 +164,7 @@ minion.addTask('somethingWithResult', async (job, num1, num2) => {
 ### Jobs
 
 Individual jobs are represented as instances of the `Job` class, which are the first argument passed to all task
-functions. To check the current status of a specific job, you can use the `minion.job()` method.
+functions. To check the current status of a specific job you can use the `minion.job()` method.
 
 ```js
 // Request a specific job (this does not prevent workers from processing the job)
@@ -207,7 +207,7 @@ const success = await job.finish('Huge success!');
 const success = await job.fail('Something went wrong!');
 ```
 
-Every job still in the database can be retried at any time, this is the only way to change many of the available
+Every job still in the database can be retried at any time, this is also the only way to change most of the available
 processing options. A worker already processing this job will not be able to assign a result afterwards, but it will
 not stop processing.
 
@@ -236,6 +236,37 @@ const success = await job.retry({
   // Queue to put job in
   queue: 'unimportant'
 });
+```
+
+The iterator API allows you to search through all jobs currently in the database.
+
+```js
+const jobs = minion.jobs({
+
+  // List only jobs with these ids
+  ids: [23, 24],
+
+  // List only jobs with one of these notes
+  notes: ['foo', 'bar'],
+
+  // List only jobs in these queues
+  queues: ['important', 'unimportant'],
+
+  // List only jobs in these states
+  states: ['inactive', 'active'],
+
+  // List only jobs for these tasks
+  tasks: ['foo', 'bar']
+});
+
+// Total number of results
+const total = await jobs.total();
+
+// Iterate current job states
+for await (const info of jobs) {
+  const {id, state} = info;
+  console.log(`${id}: ${state}`);
+}
 ```
 
 ## Deployment
