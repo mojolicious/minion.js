@@ -270,18 +270,74 @@ for await (const info of jobs) {
 }
 ```
 
-## Deployment
+## mojo.js
+
+You can use Minion as a standalone job queue, or integrate it into [mojo.js](https://mojojs.org) applications with
+`minionPlugin`.
+
+```js
+import {minionPlugin} from '@minionjs/core';
+import mojo from '@mojojs/core';
+
+export const app = mojo();
+
+app.plugin(minionPlugin, {config: 'postgres://user:password@localhost:5432/database'});
+
+// Slow task
+app.models.minion.addTask('poke_mojo', async job => {
+  await job.app.ua.get('mojolicious.org');
+  job.app.log.debug('We have poked mojolicious.org for a visitor');
+});
+
+// Perform job in a background worker process
+app.get('/', async ctx => {
+  await ctx.models.minion.enqueue('poke_mojo');
+  await ctx.render({text: 'We will poke mojolicious.org for you soon.'});
+});
+
+app.start();
+```
+
+Background worker processes are usually started with the `minion-worker` command, which becomes automatically available
+when an application loads `minionPlugin`.
+
+```
+$ node index.js minion-worker
+```
+
+Jobs can be managed right from the command line with the `minion-job` command.
+
+```
+$ node index.js minion-job
+```
+
+You can also add an admin ui to your application by loading `minionAdminPlugin`. Just make sure to secure access before
+making your application publicly accessible.
+
+```js
+import {minionPlugin, minionAdminPlugin} from '@minionjs/core';
+import mojo from '@mojojs/core';
+
+export const app = mojo();
+
+app.plugin(minionPlugin, {config: 'postgres://user:password@localhost:5432/database'});
+app.plugin(minionAdminPlugin);
+
+app.start();
+```
+
+### Deployment
 
 To manage background worker processes with systemd, you can use a unit configuration file like this.
 
 ```
 [Unit]
-Description=My Mojolicious application workers
+Description=My mojo.js application worker
 After=postgresql.service
 
 [Service]
 Type=simple
-ExecStart=/home/sri/myapp/myapp.pl minion worker -m production
+ExecStart=NODE_ENV=production node /home/sri/myapp/myapp.js minion-worker
 KillMode=process
 
 [Install]
