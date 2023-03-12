@@ -91,14 +91,26 @@ is left in an uncertain state, depending on the value of the `minion.missingAfte
 processed after a certain amount of time, will be considered stuck and fail automatically, depending on the value of
 the `minion.stuckAfter` property. So an admin can take a look and resolve the issue.
 
-### Enqueue Options
+## API
+
+Minion.js uses a PostgreSQL backend by default, but the `backendClass` option can be used for alternative database
+backends. The Perl version also supports SQLite and MySQL for example. See the
+[PgBackend](https://github.com/mojolicious/minion.js/blob/main/src/pg-backend.ts) class for inspiration.
+
+```js
+// Default PostgreSQL backend
+const minion = new Minion('postgres://user:password@localhost:5432/database');
+
+// Custom 3rd party backend
+const minion = new Minion('sqlite:test.db', {backendClass: SQLiteBackend});
+```
 
 New jobs are created with the `minion.enqueue()` method, which requires a task name to tell the worker what kind of
 workload the job represents, an array with job arguments, and an object with optional features to use for processing
-this job.
+this job. Every created job has a unique id that can be used to check the current status or request its result.
 
 ```js
-await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
+const jobId = await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
 
   // Number of times performing this job will be attempted (defaults to 0), with a computed increasing delay
   attempts: 5,
@@ -125,6 +137,23 @@ await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
 
   // Queue to put job in (defaults to "default")
   queue: 'important'
+});
+```
+
+Tasks are created with `minion.addTask()`, and represent the individual workloads that workers can perform. Not all
+workers need to have the same tasks, but it is recommended for easier to maintain code. If you want to route individual
+jobs to certain workers, it is better to use named queues for that than tasks.
+
+```js
+// Task without result
+minion.addTask('somethingSlow', async job => {
+  console.log('This is a background worker process.');
+});
+
+// Task without result
+minion.addTask('somethingWithResult', async (job, num1, num2) => {
+  const rersult = num1 + num2;
+  await job.finish(result);
 });
 ```
 
