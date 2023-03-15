@@ -105,7 +105,20 @@ Minion uses a PostgreSQL backend by default, but allows for 3rd party implementa
 
 ```js
 // Default PostgreSQL backend
-const minion = new Minion('postgres://user:password@localhost:5432/database');
+const minion = new Minion('postgres://user:password@localhost:5432/database', {
+  // Amount of time in milliseconds after which workers without a heartbeat will be considered missing and removed from
+  // the registry, defaults to 30 minutes
+  missingAfter: 1800000,
+
+  // Amount of time in seconds after which jobs that have reached the state finished and have no unresolved
+  // dependencies will be removed automatically by "repair", defaults to 2 days (it is not recommended to set this
+  // value below 2 days)
+  removeAfter: 172800000,
+
+  // Amount of time in seconds after which jobs that have not been processed will be considered stuck and transition to
+  // the failed state, defaults to 2 days
+  stuckAfter: 172800000
+});
 
 // Custom 3rd party backend
 const minion = new Minion('sqlite:test.db', {backendClass: SQLiteBackend});
