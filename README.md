@@ -289,6 +289,27 @@ for await (const info of jobs) {
 }
 ```
 
+## Utilities
+
+```js
+// Retry job in "minion_foreground" queue, then perform it right away with a temporary worker in this process, very
+// useful for debugging
+const success = await minion.foreground(23);
+
+// Broadcast "jobs" command to pause worker 23
+const success = await minion.broadcast('jobs', [0], [23]);
+
+// Reset job queue
+await minion.reset({
+
+  // Reset everything
+  all: true,
+
+  // Reset only locks
+  locks: true
+});
+```
+
 ## mojo.js
 
 You can use Minion as a standalone job queue, or integrate it into [mojo.js](https://mojojs.org) applications with
