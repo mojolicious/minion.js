@@ -91,6 +91,12 @@ is left in an uncertain state, depending on the value of the `minion.missingAfte
 processed after a certain amount of time, will be considered stuck and fail automatically, depending on the value of
 the `minion.stuckAfter` property. So an admin can take a look and resolve the issue.
 
+## Examples
+
+This distribution also contains a great example application you can use for inspiration. The
+[link checker](https://github.com/mojolicious/minion.js/tree/main/examples/linkcheck) will show you how to integrate
+background jobs into well-structured [mojo.js](https://mojojs.org) applications.
+
 ## API
 
 Minion uses a PostgreSQL backend by default, but allows for 3rd party implementations of alternative backends. See the
