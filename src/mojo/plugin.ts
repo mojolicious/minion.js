@@ -5,7 +5,7 @@ import Path from '@mojojs/path';
 
 interface PluginOptions extends MinionOptions {
   autoUpdate?: boolean;
-  config: any;
+  config?: any;
 }
 
 declare module '@mojojs/core' {
