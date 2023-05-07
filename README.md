@@ -66,7 +66,7 @@ await worker.start();
 - Parallel processing
 - Rremote control
 - Multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
-- [mojo.js](https://mojojs.org) admin ui
+- [mojo.js admin ui](#mojojs)
 
 ### Job Queue
 
