@@ -17,8 +17,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/mojolicious/minion.js/badge.svg?branch=main)](https://coveralls.io/github/mojolicious/minion.js?branch=main)
 [![npm](https://img.shields.io/npm/v/@minionjs/core.svg)](https://www.npmjs.com/package/@minionjs/core)
 
-***Preview Release*** A high performance job queue for Node.js. Written in TypeScript. Also available for
-[Perl](https://github.com/mojolicious/minion).
+A high performance job queue for Node.js and PostgreSQL. With support for alternative database backends. Written in
+TypeScript. Also available for [Perl](https://github.com/mojolicious/minion).
 
 ```js
 import Minion from '@minionjs/core';
