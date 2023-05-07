@@ -8,10 +8,25 @@
 ***Preview Release*** A high performance job queue for Node.js. Written in TypeScript. Also available for
 [Perl](https://github.com/mojolicious/minion).
 
-Minion.js comes with support for multiple named queues, priorities, high priority fast lane, delayed jobs,
-job dependencies, job progress, job results, retries with backoff, rate limiting, unique jobs, expiring jobs,
-statistics, distributed workers, parallel processing, remote control, [mojo.js](https://mojojs.org) admin ui and
-multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
+## Features
+
+- Multiple named queues
+- Priorities
+- High priority fast lane
+- Delayed jobs
+- Job dependencies
+- Job progress
+- Job results
+- Retries with backoff
+- Rate limiting
+- Unique jobs
+- Expiring jobs
+- Statistics
+- Distributed workers
+- Parallel processing
+- Rremote control
+- Multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
+- [mojo.js](https://mojojs.org) admin ui
 
 ```js
 import Minion from '@minionjs/core';
@@ -289,7 +304,7 @@ for await (const info of jobs) {
 }
 ```
 
-## Utilities
+### Utilities
 
 ```js
 // Retry job in "minion_foreground" queue, then perform it right away with a temporary worker in this process, very
@@ -310,7 +325,7 @@ await minion.reset({
 });
 ```
 
-## mojo.js
+### mojo.js
 
 You can use Minion as a standalone job queue, or integrate it into [mojo.js](https://mojojs.org) applications with
 `minionPlugin`.
@@ -368,7 +383,7 @@ app.plugin(minionAdminPlugin, {route: minionPrefix});
 app.start();
 ```
 
-### Deployment
+## Deployment
 
 To manage background worker processes with systemd, you can use a unit configuration file like this.
 
