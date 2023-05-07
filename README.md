@@ -64,7 +64,7 @@ await worker.start();
 - Statistics
 - Distributed workers
 - Parallel processing
-- Rremote control
+- Remote control
 - Multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
 - [mojo.js admin ui](#mojojs)
 
