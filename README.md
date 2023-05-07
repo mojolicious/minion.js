@@ -1,32 +1,24 @@
 
 ![Screenshot](https://raw.github.com/mojolicious/minion.js/main/examples/admin.png?raw=true)
 
+<div align="center">
+  <p>
+    <a href="#features"><strong>Features</strong></a> ·
+    <a href="#examples"><strong>Examples</strong></a> ·
+    <a href="#api"><strong>API</strong></a> ·
+    <a href="#deployment"><strong>Deployment</strong></a> ·
+    <a href="#installation"><strong>Installation</strong></a> ·
+    <a href="#support"><strong>Support</strong></a>
+  </p>
+  <br/>
+</div>
+
 [![](https://github.com/mojolicious/minion.js/workflows/test/badge.svg)](https://github.com/mojolicious/minion.js/actions)
 [![Coverage Status](https://coveralls.io/repos/github/mojolicious/minion.js/badge.svg?branch=main)](https://coveralls.io/github/mojolicious/minion.js?branch=main)
 [![npm](https://img.shields.io/npm/v/@minionjs/core.svg)](https://www.npmjs.com/package/@minionjs/core)
 
 ***Preview Release*** A high performance job queue for Node.js. Written in TypeScript. Also available for
 [Perl](https://github.com/mojolicious/minion).
-
-## Features
-
-- Multiple named queues
-- Priorities
-- High priority fast lane
-- Delayed jobs
-- Job dependencies
-- Job progress
-- Job results
-- Retries with backoff
-- Rate limiting
-- Unique jobs
-- Expiring jobs
-- Statistics
-- Distributed workers
-- Parallel processing
-- Rremote control
-- Multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
-- [mojo.js](https://mojojs.org) admin ui
 
 ```js
 import Minion from '@minionjs/core';
@@ -55,6 +47,26 @@ const worker = minion.worker();
 worker.status.jobs = 12;
 await worker.start();
 ```
+
+## Features
+
+- Multiple named queues
+- Priorities
+- High priority fast lane
+- Delayed jobs
+- Job dependencies
+- Job progress
+- Job results
+- Retries with backoff
+- Rate limiting
+- Unique jobs
+- Expiring jobs
+- Statistics
+- Distributed workers
+- Parallel processing
+- Rremote control
+- Multiple backends (such as [PostgreSQL](https://www.postgresql.org)).
+- [mojo.js](https://mojojs.org) admin ui
 
 ### Job Queue
 
