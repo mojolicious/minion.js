@@ -10,7 +10,7 @@
     %= ctx.content.header
   </head>
   <body>
-    <h1><%= await ctx.linkTo('index', {class: 'title'}, 'Link Check') %></h1>
+    <h1><%= await tags.linkTo('index', {class: 'title'}, 'Link Check') %></h1>
     %= ctx.content.main
   </body>
 </html>

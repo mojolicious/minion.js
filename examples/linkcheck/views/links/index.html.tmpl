@@ -1,7 +1,7 @@
 % view.layout = 'linkcheck';
 % stash.title = 'Check links';
 <{formBlock}>
-  %= await ctx.inputTag('url', {type: 'url', value: 'https://mojolicious.org/perldoc'})
-  %= await ctx.submitButtonTag('Check')
+  %= await tags.input('url', {type: 'url', value: 'https://mojolicious.org/perldoc'})
+  %= await tags.submitButton('Check')
 <{/formBlock}>
-%= await ctx.formFor('check', {class: 'check-form'}, await formBlock());
+%= await tags.formFor('check', {class: 'check-form'}, await formBlock());

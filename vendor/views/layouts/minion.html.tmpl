@@ -2,16 +2,16 @@
   <head>
     <title><%= stash.title ?? 'Minion' %></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    %= await ctx.scriptTag('/minion/jquery/jquery.js')
-    %= await ctx.scriptTag('/minion/bootstrap/bootstrap.js')
-    %= await ctx.styleTag('/minion/bootstrap/bootstrap.css')
-    %= await ctx.scriptTag('/minion/moment/moment.js')
-    %= await ctx.scriptTag('/minion/d3/d3.js')
-    %= await ctx.scriptTag('/minion/epoch/epoch.js')
-    %= await ctx.styleTag('/minion/epoch/epoch.css')
-    %= await ctx.styleTag('/minion/fontawesome/fontawesome.css')
-    %= await ctx.styleTag('/minion/app.css')
-    %= await ctx.scriptTag('/minion/app.js')
+    %= await tags.script('/minion/jquery/jquery.js')
+    %= await tags.script('/minion/bootstrap/bootstrap.js')
+    %= await tags.style('/minion/bootstrap/bootstrap.css')
+    %= await tags.script('/minion/moment/moment.js')
+    %= await tags.script('/minion/d3/d3.js')
+    %= await tags.script('/minion/epoch/epoch.js')
+    %= await tags.style('/minion/epoch/epoch.css')
+    %= await tags.style('/minion/fontawesome/fontawesome.css')
+    %= await tags.style('/minion/app.css')
+    %= await tags.script('/minion/app.js')
     <script>
       $(() => {
         checkAll();
