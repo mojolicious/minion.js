@@ -355,7 +355,7 @@ export class PgBackend {
     `;
 
     // Expired jobs
-    await pg.query`DELETE FROM minion_jobs WHERE  state = 'inactive' AND expires <= NOW()`;
+    await pg.query`DELETE FROM minion_jobs WHERE state = 'inactive' AND expires <= NOW()`;
 
     // Jobs with missing worker (can be retried)
     const jobs = await pg.query<JobWithMissingWorkerResult>`
