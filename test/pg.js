@@ -22,11 +22,11 @@ t.test('PostgreSQL backend', skip, async t => {
   });
 
   await t.test('Migrate up and down', async t => {
-    t.equal(await minion.backend.pg.migrations.active(), 23);
+    t.equal(await minion.backend.pg.migrations.active(), 24);
     await minion.backend.pg.migrations.migrate(0);
     t.equal(await minion.backend.pg.migrations.active(), 0);
     await minion.backend.pg.migrations.migrate();
-    t.equal(await minion.backend.pg.migrations.active(), 23);
+    t.equal(await minion.backend.pg.migrations.active(), 24);
     t.equal(minion.backend.name, 'Pg');
   });
 

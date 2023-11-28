@@ -51,6 +51,7 @@
     "@types/node": "^20.0.0",
     "@types/nopt": "^3.0.29",
     "@types/pg": "^8.6.1",
+    "@types/react": "^18.2.39",
     "@types/stack-utils": "^2.0.1",
     "@types/tap": "^15.0.3",
     "@types/tough-cookie": "^4.0.2",
