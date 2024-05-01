@@ -316,6 +316,66 @@ for await (const info of jobs) {
 }
 ```
 
+### Locks
+
+Named locks are a tool that can be used for many things, inside and outside of task functions. They expire
+automatically after a certain amont of time in milliseconds. You can release the lock manually with `minion.unlock()`
+to limit concurrency, or let it expire fro rate limiting.
+
+```js
+// Acquire a named lock
+const success = await minion.lock('fragile_backend_service', 5000, {
+
+  // Number of shared locks with the same name that can be active at the same time (defaults to "1")
+  limit: 5
+});
+
+// Check if a named lock currently exists
+const success = await minion.isLocked('fragile_backend_service');
+
+// Release a named lock
+const success = await minion.unlock('fragile_backend_service');
+```
+
+The most common use for named locks is limiting access to shared resources.
+
+```js
+// Only one job should run at a time (unique job)
+minion.addTask('do_unique_stuff', async job => {
+  if (await minion.lock('fragile_web_service', 7200000) !== true) {
+    await minion.finish('Previous job still active')
+    return;
+  }
+  ...
+  await minion.unlock('fragile_web_service');
+});
+
+// Only five jobs should run at a time and we wait for our turn
+minion.addTask('do_concurrent_stuff', async job => {
+  while (await minion.lock('some_web_service', 60000, {limit: 5}) !== true) {
+    await sleep(1000);
+  }
+  ...
+  await minion.unlock('some_web_service');
+});
+
+// Only a hundred jobs should run per hour and we try again later if necessary
+minion.addTask('do_rate_limit_stuff', async job => {
+  if (await minion.lock('another_web_service', 360000, {limit: 100}) !== true) {
+    await minion.retry({delay: 3600000})
+    return;
+  }
+  ...
+});
+```
+
+An expiration time of `0` can be used to check if a named lock could have been acquired without creating one.
+
+```js
+// Check if the lock "foo" could have been acquired
+const success = await $minion.lock('foo', 0);
+```
+
 ### Utilities
 
 ```js
