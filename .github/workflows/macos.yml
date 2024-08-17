@@ -18,7 +18,8 @@ jobs:
 
       - name: PostgreSQL Setup
         run: |
-          brew services start postgresql
+          brew install postgresql@14
+          brew services start postgresql@14
           echo "Check PostgreSQL service is running"
           i=10
           COMMAND='pg_isready'
