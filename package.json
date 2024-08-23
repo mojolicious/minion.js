@@ -1,6 +1,6 @@
 {
   "name": "@minionjs/core",
-  "version": "0.3.15",
+  "version": "1.0.0",
   "description": "Node.js job queue",
   "keywords": [
     "postgres",
