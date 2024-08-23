@@ -299,17 +299,22 @@ export default class Minion {
     resolve: (value?: any) => void,
     reject: (reason?: any) => void
   ) {
-    const info = (await this.backend.listJobs(0, 1, {ids: [id]})).jobs[0];
-    if (info === undefined) {
-      resolve(null);
-    } else if (info.state === 'finished') {
-      resolve(info);
-    } else if (info.state === 'failed') {
-      reject(info);
-    } else if (signal !== null && signal.aborted === true) {
-      reject(new AbortError());
-    } else {
-      setTimeout(() => this._result(id, interval, signal, resolve, reject), interval);
+    const rerun = () => this._result(id, interval, signal, resolve, reject);
+    try {
+      const info = (await this.backend.listJobs(0, 1, {ids: [id]})).jobs[0];
+      if (info === undefined) {
+        resolve(null);
+      } else if (info.state === 'finished') {
+        resolve(info);
+      } else if (info.state === 'failed') {
+        reject(info);
+      } else if (signal !== null && signal.aborted === true) {
+        reject(new AbortError());
+      } else {
+        setTimeout(rerun, interval);
+      }
+    } catch (error: any) {
+      setTimeout(rerun, interval);
     }
   }
 }
