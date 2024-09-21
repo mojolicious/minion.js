@@ -351,7 +351,11 @@ export class PgBackend {
     // Old jobs
     await pg.query`
       DELETE FROM minion_jobs
-      WHERE state = 'finished' AND finished <= NOW() - INTERVAL '1 millisecond' * ${minion.removeAfter}
+      WHERE id IN (
+        SELECT id FROM minion_jobs
+        WHERE state = 'finished' AND finished <= NOW() - INTERVAL '1 second' * ${minion.removeAfter}
+        EXCEPT SELECT unnest(parents) AS id FROM minion_jobs WHERE state != 'finished'
+      )
     `;
 
     // Expired jobs
