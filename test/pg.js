@@ -92,11 +92,11 @@ t.test('PostgreSQL backend', skip, async t => {
     const signal = ac.signal;
     const promise4 = minion
       .result(id, {interval: 10, signal})
-      .then(value => (failed = value))
+      .then(value => (finished = value))
       .catch(reason => (failed = reason));
     setTimeout(() => ac.abort(), 250);
     await promise4;
-    t.same(finished, undefined);
+    t.strictSame(finished, undefined);
     t.same(failed.name, 'AbortError');
 
     finished = undefined;
@@ -105,10 +105,10 @@ t.test('PostgreSQL backend', skip, async t => {
     t.same(await job4.remove(), true);
     const promise5 = minion
       .result(id, {interval: 10, signal})
-      .then(value => (failed = value))
+      .then(value => (finished = value))
       .catch(reason => (failed = reason));
     await promise5;
-    t.same(finished, null);
+    t.strictSame(finished, null);
     t.same(failed, undefined);
 
     await worker.unregister();
