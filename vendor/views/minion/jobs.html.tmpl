@@ -127,7 +127,7 @@
                 </td>
                 % if (job.state === 'active' || job.state === 'finished' || job.state === 'failed') {
                   % const end = job.state === 'active' ? 'time' : 'finished';
-                  % const runtime = job[end] - job.started;
+                  % const runtime = (job[end] - job.started) / 1000;
                   <td class="accordion-toggle collapsed duration" data-toggle="collapse" data-target="#job<%= num %>">
                     <%= runtime %>
                   </td>
