@@ -1,4 +1,4 @@
-import {minionPlugin} from '../lib/minion.js';
+import {minionPlugin} from '../src/minion.ts';
 import mojo from '@mojojs/core';
 import Pg from '@mojojs/pg';
 import t from 'tap';

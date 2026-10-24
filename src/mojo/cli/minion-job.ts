@@ -1,126 +1,106 @@
-import type Minion from '../../minion.js';
-import type {EnqueueOptions, ListJobsOptions, ListLocksOptions} from '../../types.js';
+import type Minion from '../../minion.ts';
+import type {EnqueueOptions, ListJobsOptions, ListLocksOptions, MinionStates} from '../../types.ts';
 import type {MojoApp} from '@mojojs/core';
+import {parseArgs} from 'node:util';
 import {tablify} from '@mojojs/util';
-import yaml from 'js-yaml';
-import nopt from 'nopt';
+import * as yaml from 'js-yaml';
 
 /**
  * Minion job command.
  */
 export default async function jobCommand(app: MojoApp, args: string[]): Promise<void> {
-  const parsed = nopt(
-    {
-      args: String,
-      attempts: Number,
-      broadcast: String,
-      delay: Number,
-      expire: Number,
-      enqueue: String,
-      foreground: Boolean,
-      history: Boolean,
-      lax: Boolean,
-      limit: Number,
-      locks: Boolean,
-      notes: String,
-      offset: Number,
-      parent: [Number, Array],
-      priority: Number,
-      queue: [String, Array],
-      remove: Boolean,
-      retry: Boolean,
-      'remove-failed': Boolean,
-      'retry-failed': Boolean,
-      state: [String, Array],
-      stats: Boolean,
-      task: [String, Array],
-      workers: Boolean
+  const {values, positionals} = parseArgs({
+    args: args.slice(1),
+    options: {
+      args: {type: 'string', short: 'a'},
+      attempts: {type: 'string', short: 'A'},
+      broadcast: {type: 'string', short: 'b'},
+      delay: {type: 'string', short: 'd'},
+      expire: {type: 'string', short: 'E'},
+      enqueue: {type: 'string', short: 'e'},
+      foreground: {type: 'boolean', short: 'f'},
+      history: {type: 'boolean', short: 'H'},
+      lax: {type: 'boolean', short: 'x'},
+      limit: {type: 'string', short: 'l'},
+      locks: {type: 'boolean', short: 'L'},
+      notes: {type: 'string', short: 'n'},
+      offset: {type: 'string', short: 'o'},
+      parent: {type: 'string', short: 'P', multiple: true},
+      priority: {type: 'string', short: 'p'},
+      queue: {type: 'string', short: 'q', multiple: true},
+      remove: {type: 'boolean'},
+      retry: {type: 'boolean', short: 'R'},
+      'remove-failed': {type: 'boolean'},
+      'retry-failed': {type: 'boolean'},
+      state: {type: 'string', short: 'S', multiple: true},
+      stats: {type: 'boolean', short: 's'},
+      task: {type: 'string', short: 't', multiple: true},
+      workers: {type: 'boolean', short: 'w'}
     },
-    {
-      A: '--attempts',
-      a: '--args',
-      b: '--broadcast',
-      d: '--delay',
-      E: '--expire',
-      e: '--enqueue',
-      f: '--foreground',
-      H: '--history',
-      L: '--locks',
-      l: '--limit',
-      n: '--notes',
-      o: '--offset',
-      P: '--parent',
-      p: '--priority',
-      q: '--queue',
-      R: '--retry',
-      S: '--state',
-      s: '--stats',
-      t: '--task',
-      x: '--lax',
-      w: '--workers'
-    },
-    args,
-    1
-  );
+    allowPositionals: true,
+    allowNegative: true
+  });
 
-  const id = parseInt(parsed.argv.remain[0]);
+  const id = parseInt(positionals[0]);
   const minionArgs = [];
-  if (parsed.args !== undefined) {
-    const data = JSON.parse(parsed.args);
+  if (values.args !== undefined) {
+    const data = JSON.parse(values.args);
     if (Array.isArray(data)) minionArgs.push(...data);
   }
   const options: EnqueueOptions & ListJobsOptions = {};
 
-  if (typeof parsed.attempts === 'number') options.attempts = parsed.attempts;
-  if (typeof parsed.delay === 'number') options.delay = parsed.delay;
-  if (typeof parsed.expire === 'number') options.expire = parsed.expire;
-  if (typeof parsed.notes === 'string') options.notes = JSON.parse(parsed.notes);
-  if (Array.isArray(parsed.parent)) options.parents = parsed.parent;
-  if (typeof parsed.priority === 'number') options.priority = parsed.priority;
-  if (Array.isArray(parsed.queue)) {
-    options.queue = parsed.queue[0];
-    options.queues = parsed.queue;
+  if (values.attempts !== undefined) options.attempts = toNumber(values.attempts);
+  if (values.delay !== undefined) options.delay = toNumber(values.delay);
+  if (values.expire !== undefined) options.expire = toNumber(values.expire);
+  if (values.notes !== undefined) options.notes = JSON.parse(values.notes);
+  if (values.parent !== undefined) options.parents = values.parent.map(toNumber);
+  if (values.priority !== undefined) options.priority = toNumber(values.priority);
+  if (values.queue !== undefined) {
+    options.queue = values.queue[0];
+    options.queues = values.queue;
   }
-  if (Array.isArray(parsed.state)) options.states = parsed.state;
-  if (Array.isArray(parsed.task)) options.tasks = parsed.task;
-  if (parsed.lax === true) options.lax = true;
+  if (values.state !== undefined) options.states = values.state as MinionStates[];
+  if (values.task !== undefined) options.tasks = values.task;
+  if (values.lax === true) options.lax = true;
+  const limit = values.limit === undefined ? undefined : toNumber(values.limit);
+  const offset = values.offset === undefined ? undefined : toNumber(values.offset);
 
   const minion = app.models.minion;
   const stdout = process.stdout;
 
   // Worker remote control command
-  if (parsed.broadcast !== undefined) {
+  if (values.broadcast !== undefined) {
     await minion.broadcast(
-      parsed.broadcast,
+      values.broadcast,
       minionArgs,
-      parsed.argv.remain.map(id => parseInt(id))
+      positionals.map(id => parseInt(id))
     );
   }
 
   // History
-  else if (parsed.history === true) {
+  else if (values.history === true) {
     stdout.write(yaml.dump(await minion.history()));
   }
 
   // Stats
-  else if (parsed.stats === true) {
+  else if (values.stats === true) {
     stdout.write(yaml.dump(await minion.stats()));
   }
 
   // Enqueue
-  else if (parsed.enqueue !== undefined) {
-    const id = await minion.enqueue(parsed.enqueue, minionArgs, options);
+  else if (values.enqueue !== undefined) {
+    const id = await minion.enqueue(values.enqueue, minionArgs, options);
     stdout.write(`${id}\n`);
   }
 
   // List locks
-  else if (parsed.locks === true) {
-    const names = parsed.argv.remain;
-    await listLocks(minion, parsed.limit, parsed.offset, {names: names.length > 0 ? names : undefined});
+  else if (values.locks === true) {
+    const names = positionals;
+    await listLocks(minion, limit, offset, {names: names.length > 0 ? names : undefined});
   }
 
   // List workers
-  else if (parsed.workers === true) {
+  else if (values.workers === true) {
     if (isNaN(id) === false) {
       const worker = (await minion.backend.listWorkers(0, 1, {ids: [id]})).workers[0];
       if (worker === undefined) {
@@ -129,19 +109,19 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
         stdout.write(yaml.dump(worker));
       }
     } else {
-      await listWorkers(minion, parsed.limit, parsed.offset);
+      await listWorkers(minion, limit, offset);
     }
   }
 
   // Retry all failed jobs
-  else if (parsed['retry-failed'] === true) {
+  else if (values['retry-failed'] === true) {
     for await (const job of minion.jobs({states: ['failed']})) {
       await minion.job(job.id).then(job => job?.retry(options));
     }
   }
 
   // Remove all failed jobs
-  else if (parsed['remove-failed'] === true) {
+  else if (values['remove-failed'] === true) {
     for await (const job of minion.jobs({states: ['failed']})) {
       await minion.job(job.id).then(job => job?.remove());
     }
@@ -155,18 +135,18 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
     }
 
     // Retry
-    else if (parsed.retry === true) {
+    else if (values.retry === true) {
       await job.retry(options);
     }
 
     // Remove
-    else if (parsed.remove === true) {
+    else if (values.remove === true) {
       const removed = await job.remove();
       if (removed === false) stdout.write('Job is active.\n');
     }
 
     // Foreground
-    else if (parsed.foreground === true) {
+    else if (values.foreground === true) {
       await minion.foreground(id);
     }
 
@@ -178,7 +158,7 @@ export default async function jobCommand(app: MojoApp, args: string[]): Promise<
 
   // List jobs
   else {
-    await listJobs(minion, parsed.limit, parsed.offset, options);
+    await listJobs(minion, limit, offset, options);
   }
 }
 
@@ -259,3 +239,9 @@ Options:
   -x, --lax                     Jobs this job depends on may also have failed
                                 to allow for it to be processed
 `;
+
+function toNumber(value: string): number {
+  const number = Number(value);
+  if (value.trim() === '' || Number.isNaN(number)) throw new Error(`Invalid number "${value}"`);
+  return number;
+}

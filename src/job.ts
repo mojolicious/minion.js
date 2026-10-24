@@ -1,5 +1,5 @@
-import type Minion from './minion.js';
-import type {JobInfo, MinionArgs, MinionJob, MinionJobId, RetryOptions} from './types.js';
+import type Minion from './minion.ts';
+import type {JobInfo, MinionArgs, MinionJob, MinionJobId, RetryOptions} from './types.ts';
 import type {MojoApp} from '@mojojs/core';
 
 /**

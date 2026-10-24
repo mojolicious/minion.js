@@ -1,4 +1,4 @@
-import {minionPlugin} from '../lib/minion.js';
+import {minionPlugin} from '../src/minion.ts';
 import mojo from '@mojojs/core';
 import Pg from '@mojojs/pg';
 import {captureOutput} from '@mojojs/util';
@@ -90,7 +90,7 @@ t.test('Command app', skip, async t => {
       t.match(output.toString(), /id: 1.+jobs:.+- '1'/s);
 
       const output2 = await captureOutput(async () => {
-        await app.cli.start('minion-job', '--worker', '1000');
+        await app.cli.start('minion-job', '--workers', '1000');
       });
       t.match(output2.toString(), /Worker does not exist/s);
     });
@@ -374,7 +374,7 @@ t.test('Command app', skip, async t => {
       t.equal(status.jobs, 2);
       t.equal(status.spare, 3);
       t.equal(status.type, 'Node.js');
-      t.equal(status.queues[('important', 'default')]);
+      t.same(status.queues, ['important', 'default']);
       t.ok(status.performed >= 0);
       t.equal(status.dequeueTimeout, 3000);
       t.equal(status.heartbeatInterval, 0);
@@ -392,6 +392,14 @@ t.test('Command app', skip, async t => {
         // Just wait for the worker to stop
       }
     });
+  });
+
+  await t.test('Invalid options', async t => {
+    await t.rejects(app.cli.start('minion-job', '-l', 'ten'), /Invalid number "ten"/);
+    await t.rejects(app.cli.start('minion-job', '-e', 'test', '-P', '1x'), /Invalid number "1x"/);
+    await t.rejects(app.cli.start('minion-job', '--worker'), /Unknown option '--worker'/);
+    await t.rejects(app.cli.start('minion-worker', '-j', ''), /Invalid number ""/);
+    await t.rejects(app.cli.start('minion-worker', '--job', '2'), /Unknown option '--job'/);
   });
 
   // Clean up once we are done

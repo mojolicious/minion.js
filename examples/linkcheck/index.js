@@ -1,6 +1,6 @@
 import {checkLinksTask} from './tasks/check-links.js';
 //import {minionPlugin, minionAdminPlugin} from '@minionjs/core';
-import {minionPlugin, minionAdminPlugin} from '../../lib/minion.js';
+import {minionPlugin, minionAdminPlugin} from '../../src/minion.ts';
 import mojo, {yamlConfigPlugin} from '@mojojs/core';
 import Pg from '@mojojs/pg';
 

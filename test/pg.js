@@ -1,5 +1,5 @@
 import os from 'node:os';
-import Minion from '../lib/minion.js';
+import Minion from '../src/minion.ts';
 import mojo, {util} from '@mojojs/core';
 import Pg from '@mojojs/pg';
 import t from 'tap';

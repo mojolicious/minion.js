@@ -16,17 +16,16 @@ import type {
   ResetOptions,
   WorkerInfo,
   WorkerOptions
-} from './types.js';
-import type {MojoApp} from '@mojojs/core';
-import {Job} from './job.js';
-import {PgBackend} from './pg-backend.js';
-import {Worker} from './worker.js';
-import mojo from '@mojojs/core';
+} from './types.ts';
+import {Job} from './job.ts';
+import {PgBackend} from './pg-backend.ts';
+import {Worker} from './worker.ts';
+import mojo, {type MojoApp} from '@mojojs/core';
 import Path from '@mojojs/path';
 import {AbortError, AsyncHooks} from '@mojojs/util';
 
-export {minionPlugin} from './mojo/plugin.js';
-export {minionAdminPlugin} from './mojo/admin-plugin.js';
+export {minionPlugin} from './mojo/plugin.ts';
+export {minionAdminPlugin} from './mojo/admin-plugin.ts';
 
 export const version = JSON.parse(
   Path.currentFile().dirname().sibling('package.json').readFileSync().toString()
@@ -313,7 +312,7 @@ export default class Minion {
       } else {
         setTimeout(rerun, interval);
       }
-    } catch (error: any) {
+    } catch {
       setTimeout(rerun, interval);
     }
   }

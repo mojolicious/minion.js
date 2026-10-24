@@ -1,5 +1,5 @@
 import type {MojoApp} from '@mojojs/core';
-import nopt from 'nopt';
+import {parseArgs} from 'node:util';
 
 /**
  * Minion worker command.
@@ -8,40 +8,30 @@ export default async function workerCommand(app: MojoApp, args: string[]): Promi
   const minion = app.models.minion;
   const worker = minion.worker();
 
-  const parsed = nopt(
-    {
-      'command-interval': Number,
-      'dequeue-timeout': Number,
-      'heartbeat-interval': Number,
-      jobs: Number,
-      queue: [String, Array],
-      'repair-interval': Number,
-      spare: Number,
-      'spare-min-priority': Number
+  const {values} = parseArgs({
+    args: args.slice(1),
+    options: {
+      'command-interval': {type: 'string', short: 'C'},
+      'dequeue-timeout': {type: 'string', short: 'D'},
+      'heartbeat-interval': {type: 'string', short: 'I'},
+      jobs: {type: 'string', short: 'j'},
+      queue: {type: 'string', short: 'q', multiple: true},
+      'repair-interval': {type: 'string', short: 'R'},
+      spare: {type: 'string', short: 's'},
+      'spare-min-priority': {type: 'string', short: 'S'}
     },
-    {
-      C: '--command-interval',
-      D: '--dequeue-timeout',
-      I: '--heartbeat-interval',
-      j: '--jobs',
-      q: '--queue',
-      R: '--repair-interval',
-      s: '--spare',
-      S: '--spare-min-priority'
-    },
-    args,
-    1
-  );
+    allowNegative: true
+  });
 
   const status = worker.status;
-  if (typeof parsed['command-interval'] === 'number') status.commandInterval = parsed['command-interval'];
-  if (typeof parsed['dequeue-timeout'] === 'number') status.dequeueTimeout = parsed['dequeue-timeout'];
-  if (typeof parsed['heartbeat-interval'] === 'number') status.heartbeatInterval = parsed['heartbeat-interval'];
-  if (typeof parsed.jobs === 'number') status.jobs = parsed.jobs;
-  if (Array.isArray(parsed.queue)) status.queues = parsed.queue;
-  if (typeof parsed['repair-interval'] === 'number') status.repairInterval = parsed['repair-interval'];
-  if (typeof parsed.spare === 'number') status.spare = parsed.spare;
-  if (typeof parsed['spare-min-priority'] === 'number') status.spareMinPriority = parsed['spare-min-priority'];
+  if (values['command-interval'] !== undefined) status.commandInterval = toNumber(values['command-interval']);
+  if (values['dequeue-timeout'] !== undefined) status.dequeueTimeout = toNumber(values['dequeue-timeout']);
+  if (values['heartbeat-interval'] !== undefined) status.heartbeatInterval = toNumber(values['heartbeat-interval']);
+  if (values.jobs !== undefined) status.jobs = toNumber(values.jobs);
+  if (values.queue !== undefined) status.queues = values.queue;
+  if (values['repair-interval'] !== undefined) status.repairInterval = toNumber(values['repair-interval']);
+  if (values.spare !== undefined) status.spare = toNumber(values.spare);
+  if (values['spare-min-priority'] !== undefined) status.spareMinPriority = toNumber(values['spare-min-priority']);
 
   minion.addJobHook('job:before', (minion, job) => {
     minion.app.log.trace(`Performing job "${job.id}" with task "${job.task}"`);
@@ -80,3 +70,9 @@ Options:
   -S, --spare-min-priority <number>    Minimum priority of jobs to use spare
                                        slots for, defaults to 1
 `;
+
+function toNumber(value: string): number {
+  const number = Number(value);
+  if (value.trim() === '' || Number.isNaN(number)) throw new Error(`Invalid number "${value}"`);
+  return number;
+}

@@ -1,8 +1,8 @@
-import type {ListJobsOptions, ListLocksOptions, ListWorkersOptions, MinionStates} from '../types.js';
+import type {ListJobsOptions, ListLocksOptions, ListWorkersOptions, MinionStates} from '../types.ts';
 import type {MojoApp, MojoContext, MojoRoute} from '@mojojs/core';
-import {version} from '../minion.js';
+import {version} from '../minion.ts';
 import Path from '@mojojs/path';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 export function minionAdminPlugin(app: MojoApp, options: {returnTo?: string; route?: MojoRoute}): void {
   // Config

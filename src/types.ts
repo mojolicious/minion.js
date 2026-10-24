@@ -1,5 +1,5 @@
-import type {Job} from './job.js';
-import type {Worker} from './worker.js';
+import type {Job} from './job.ts';
+import type {Worker} from './worker.ts';
 
 export interface MinionBackend {
   broadcast: (command: string, args?: any[], ids?: MinionJobId[]) => Promise<boolean>;

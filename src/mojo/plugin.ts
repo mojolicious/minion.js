@@ -1,6 +1,5 @@
-import type {MinionOptions} from '../minion.js';
 import type {MojoApp} from '@mojojs/core';
-import Minion from '../minion.js';
+import Minion, {type MinionOptions} from '../minion.ts';
 import Path from '@mojojs/path';
 
 interface PluginOptions extends MinionOptions {
@@ -19,7 +18,7 @@ export function minionPlugin(app: MojoApp, options: PluginOptions): void {
 
   app.cli.commandPaths.push(Path.currentFile().sibling('cli').toString());
 
-  if (options.autoUpdate ?? true === true) {
+  if ((options.autoUpdate ?? true) === true) {
     app.onStart(async app => {
       await app.models.minion.update();
     });

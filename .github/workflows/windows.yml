@@ -1,5 +1,5 @@
 name: Windows
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 jobs:
   test:
     name: Node ${{ matrix.node-version }} and ${{ matrix.os }}
@@ -7,12 +7,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x, 24.x, 26.x]
         os: [windows-latest]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v7
       - name: Use Node ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -27,9 +27,7 @@ jobs:
           & $env:PGBIN\psql --username=testuser --host=localhost --list testdatabase
       - name: npm install
         run: npm i
-      - name: npm run build
-        run: npm run build
       - name: npm test
-        run: npm test
+        run: npm run test
         env:
           TEST_ONLINE: postgresql://testuser:testpassword@localhost:5432/testdatabase

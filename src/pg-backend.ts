@@ -1,4 +1,4 @@
-import type Minion from './minion.js';
+import type Minion from './minion.ts';
 import type {
   DailyHistory,
   DequeueOptions,
@@ -22,11 +22,10 @@ import type {
   RetryOptions,
   WorkerInfo,
   WorkerList
-} from './types.js';
-import type {PgConfig} from '@mojojs/pg';
+} from './types.ts';
 import os from 'node:os';
 import Path from '@mojojs/path';
-import Pg from '@mojojs/pg';
+import Pg, {type PgConfig} from '@mojojs/pg';
 
 interface DequeueResult {
   id: MinionJobId;
@@ -333,7 +332,7 @@ export class PgBackend {
   async removeJob(id: MinionJobId): Promise<boolean> {
     const results = await this.pg
       .query`DELETE FROM minion_jobs WHERE id = ${id} AND state IN ('inactive', 'failed', 'finished')`;
-    return (results.count ?? 0) > 0 ? true : false;
+    return (results.count ?? 0) > 0;
   }
 
   /**
@@ -414,7 +413,7 @@ export class PgBackend {
       retries
     );
 
-    return (results.count ?? 0) > 0 ? true : false;
+    return (results.count ?? 0) > 0;
   }
 
   /**
@@ -450,7 +449,7 @@ export class PgBackend {
         SELECT id FROM minion_locks WHERE expires > NOW() AND name = ${name} ORDER BY expires LIMIT 1 FOR UPDATE
       )
     `;
-    return (results.count ?? 0) > 0 ? true : false;
+    return (results.count ?? 0) > 0;
   }
 
   /**

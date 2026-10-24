@@ -475,7 +475,7 @@ WantedBy=multi-user.target
 
 ## Installation
 
-All you need is Node.js 16.0.0 (or newer).
+All you need is Node.js 22.18.0 (or newer).
 
 ```
 $ npm install @minionjs/core

@@ -1,4 +1,4 @@
-import Minion from '../lib/minion.js';
+import Minion from '../src/minion.ts';
 
 const ENQUEUE = 10000;
 const DEQUEUE = 1000;
