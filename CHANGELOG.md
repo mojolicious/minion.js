@@ -3,6 +3,13 @@
 
 This package strictly follows [Semantic Versioning](https://semver.org).
 
+## v2.0.1 (2026-10-24)
+
+### Bug Fixes
+
+  * Fixed a race condition in tests where jobs enqueued by other tests running in parallel could wake up a waiting
+    `dequeue` early.
+
 ## v2.0.0 (2026-10-24)
 
 ### Breaking Changes

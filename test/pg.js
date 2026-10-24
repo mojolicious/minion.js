@@ -117,7 +117,11 @@ t.test('PostgreSQL backend', skip, async t => {
   await t.test('Wait for job', async t => {
     const worker = await minion.worker().register();
     setTimeout(() => minion.enqueue('test'), 500);
-    const job = await worker.dequeue(10000);
+
+    // Notifications are shared by all schemas, so jobs from tests running in parallel can wake us up early
+    const start = Date.now();
+    let job = null;
+    while (job === null && Date.now() - start < 10000) job = await worker.dequeue(10000);
     t.notSame(job, null);
     await job.finish({one: ['two', ['three']]});
     t.same((await job.info()).result, {one: ['two', ['three']]});
