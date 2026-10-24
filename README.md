@@ -54,6 +54,7 @@ await worker.start();
 - Priorities
 - High priority fast lane
 - Delayed jobs
+- Cron style recurring jobs
 - Job dependencies
 - Job progress
 - Job results
@@ -64,6 +65,7 @@ await worker.start();
 - Statistics
 - Distributed workers
 - Parallel processing
+- Task limits
 - Remote control
 - Multiple backends (such as [PostgreSQL](https://www.postgresql.org))
 - [mojo.js admin ui](#mojojs)
@@ -83,9 +85,8 @@ Web Applications                      +--------------+                     Minio
                                                                            +- Worker [5]
 ```
 
-They are not to be confused with time based job schedulers, such as cron or systemd timers. Both serve very different
-purposes, and cron jobs are in fact commonly used to enqueue Minion jobs that need to follow a schedule. For example
-to perform regular maintenance tasks.
+They are not to be confused with time based job schedulers, such as cron or systemd timers, but Minion has built in
+support for cron style [recurring jobs](#recurring-jobs) when you want a task to run on a wall clock schedule.
 
 ### Consistency
 
@@ -137,13 +138,13 @@ const minion = new Minion('postgres://user:password@localhost:5432/database', {
   // the registry, defaults to 30 minutes
   missingAfter: 1800000,
 
-  // Amount of time in seconds after which jobs that have reached the state finished and have no unresolved
+  // Amount of time in milliseconds after which jobs that have reached the state finished and have no unresolved
   // dependencies will be removed automatically by "repair", defaults to 2 days (it is not recommended to set this
   // value below 2 days)
   removeAfter: 172800000,
 
-  // Amount of time in seconds after which jobs that have not been processed will be considered stuck and transition to
-  // the failed state, defaults to 2 days
+  // Amount of time in milliseconds after which jobs that have not been processed will be considered stuck and
+  // transition to the failed state, defaults to 2 days
   stuckAfter: 172800000
 });
 
@@ -160,7 +161,7 @@ this job. Every newly created job has a unique id that can be used to check its 
 ```js
 const jobId = await minion.enqueue('task', ['arg1', 'arg2', 'arg3'], {
 
-  // Number of times performing this job will be attempted (defaults to 0), with a computed increasing delay
+  // Number of times performing this job will be attempted (defaults to 1), with a computed increasing delay
   attempts: 5,
 
   // Delay job for this many milliseconds (from now)
@@ -202,9 +203,56 @@ minion.addTask('somethingSlow', async job => {
 
 // Task with result
 minion.addTask('somethingWithResult', async (job, num1, num2) => {
-  const rersult = num1 + num2;
+  const result = num1 + num2;
   await job.finish(result);
 });
+```
+
+### Job Dependencies
+
+The `parents` option of `minion.enqueue()` can be used to make a new job depend on one or more existing jobs, which all
+need to have reached the state `finished` before it can be processed.
+
+```js
+// Second job will not be processed until first job has finished
+const first = await minion.enqueue('stepOne');
+await minion.enqueue('stepTwo', [], {parents: [first]});
+```
+
+This is commonly used to build workflows where tasks need to run in a specific order.
+
+```js
+const a = await minion.enqueue('prepare');
+const b = await minion.enqueue('process', [], {parents: [a]});
+const c = await minion.enqueue('cleanup', [], {parents: [b]});
+```
+
+If a parent job transitions to the `failed` state, all dependent jobs will remain `inactive` and wait until it has been
+retried successfully or removed. You can use the `lax` option to allow a job to be processed even if its parents have
+`failed`.
+
+```js
+// Job will be processed even if parent jobs have failed
+await minion.enqueue('cleanup', [], {parents: [id], lax: true});
+```
+
+### Automatic Retries
+
+The `attempts` option of `minion.enqueue()` can be used to allow a job to be retried automatically if it fails, up to
+the specified number of attempts.
+
+```js
+// Job will be attempted up to five times
+await minion.enqueue('checkLinks', ['https://mojolicious.org'], {attempts: 5});
+```
+
+The delay between retries is determined by `minion.backoff()`, which defaults to `((retries ** 4) + 15) * 1000`
+milliseconds (15, 16, 31, 96, 271, 640... seconds), allowing roughly 25 attempts to be made over 21 days. You can
+change the formula by providing your own method.
+
+```js
+// Add some randomness to spread retry load
+minion.backoff = retries => (retries ** 4 + 15 + Math.floor(Math.random() * 30)) * 1000;
 ```
 
 ### Jobs
@@ -316,11 +364,35 @@ for await (const info of jobs) {
 }
 ```
 
+This is commonly used to build custom monitoring or to perform bulk operations on jobs.
+
+```js
+// Retry all failed jobs in a queue
+for await (const info of minion.jobs({states: ['failed'], queues: ['important']})) {
+  const job = await minion.job(info.id);
+  await job?.retry();
+}
+```
+
+And `minion.result()` can be used to wait for the result of a job, it returns a promise that will be fulfilled when the
+job reaches the state `finished`, or rejected when it reaches the state `failed`.
+
+```js
+// Enqueue job and receive the result at some point in the future
+const id = await minion.enqueue('foo');
+try {
+  const info = await minion.result(id, {interval: 1000});
+  console.log(`Finished: ${info.result}`);
+} catch (info) {
+  console.log(`Failed: ${info.result}`);
+}
+```
+
 ### Locks
 
 Named locks are a tool that can be used for many things, inside and outside of task functions. They expire
-automatically after a certain amont of time in milliseconds. You can release the lock manually with `minion.unlock()`
-to limit concurrency, or let it expire fro rate limiting.
+automatically after a certain amount of time in milliseconds. You can release the lock manually with `minion.unlock()`
+to limit concurrency, or let it expire for rate limiting.
 
 ```js
 // Acquire a named lock
@@ -343,7 +415,7 @@ The most common use for named locks is limiting access to shared resources.
 // Only one job should run at a time (unique job)
 minion.addTask('do_unique_stuff', async job => {
   if (await minion.lock('fragile_web_service', 7200000) !== true) {
-    await minion.finish('Previous job still active')
+    await job.finish('Previous job still active');
     return;
   }
   ...
@@ -361,19 +433,215 @@ minion.addTask('do_concurrent_stuff', async job => {
 
 // Only a hundred jobs should run per hour and we try again later if necessary
 minion.addTask('do_rate_limit_stuff', async job => {
-  if (await minion.lock('another_web_service', 360000, {limit: 100}) !== true) {
-    await minion.retry({delay: 3600000})
+  if (await minion.lock('another_web_service', 3600000, {limit: 100}) !== true) {
+    await job.retry({delay: 3600000});
     return;
   }
   ...
 });
 ```
 
+Each lock acquired for rate limiting will count against the limit for the duration of its expiration time, effectively
+capping throughput to `limit` jobs per expiration period.
+
 An expiration time of `0` can be used to check if a named lock could have been acquired without creating one.
 
 ```js
 // Check if the lock "foo" could have been acquired
-const success = await $minion.lock('foo', 0);
+const success = await minion.lock('foo', 0);
+```
+
+### Recurring Jobs
+
+For jobs that should run on a wall clock schedule, use `minion.schedule()` with a cron expression. Schedules are stored
+in the database as the source of truth, so they survive restarts and only fire once per interval no matter how many
+workers are running.
+
+```js
+// Daily cleanup at 4am
+await minion.schedule('daily_cleanup', '0 4 * * *', 'cleanup');
+
+// Every five minutes, with arguments and options
+await minion.schedule('refresh', '*/5 * * * *', 'refreshCache', ['users'], {
+  // Number of times performing each enqueued job will be attempted (defaults to 1)
+  attempts: 3,
+
+  // Each enqueued job is valid for this many milliseconds before it expires (stored with a precision of seconds)
+  expire: 300000,
+
+  // Existing jobs each enqueued job depends on may also have transitioned to the "failed" state
+  lax: false,
+
+  // Object with arbitrary metadata applied to each enqueued job
+  notes: {foo: 'bar'},
+
+  // Priority of each enqueued job (defaults to 0)
+  priority: 5,
+
+  // Queue to put each enqueued job in (defaults to "default")
+  queue: 'important'
+});
+```
+
+A cron expression is five fields separated by spaces, one for each part of the wall clock. All times are interpreted in
+**UTC**, not local time.
+
+```
+* * * * *
+| | | | |
+| | | | +---- day of week  (0-6, 0=Sun; or SUN-SAT; 7 also means Sun)
+| | | +------ month        (1-12; or JAN-DEC)
+| | +-------- day of month (1-31)
+| +---------- hour         (0-23)
++------------ minute       (0-59)
+```
+
+A `*` means "every value", so `* * * * *` reads as "every minute of every hour, every day". Pin a field to a specific
+number to fix that part of the clock.
+
+```
+0 4 * * *       # 04:00 every day
+30 9 * * 1      # 09:30 every Monday
+0 0 1 1 *       # midnight on January 1st (once a year)
+```
+
+Use `/N` for "every Nth value", `a-b` for ranges, and commas for lists.
+
+```
+*/15 * * * *    # every 15 minutes
+0 9-17 * * *    # at the top of every hour from 09:00 to 17:00
+0 9 * * 1-5     # 09:00 every weekday
+0 0,12 * * *    # midnight and noon
+```
+
+Common patterns also have nicknames that expand to one of the forms above.
+
+```
+@hourly         # 0 * * * *
+@daily          # 0 0 * * *
+@midnight       # 0 0 * * *
+@weekly         # 0 0 * * 0
+@monthly        # 0 0 1 * *
+@yearly         # 0 0 1 1 *
+```
+
+When both day-of-month and day-of-week are restricted, the job fires when **either** matches, following the standard
+Vixie cron behavior. So `0 0 1 * 0` means "midnight on the 1st of the month **and** every Sunday at midnight".
+
+Adding a schedule with an existing name updates it, reusing the same cron expression preserves the next firing time,
+changing it recomputes it. Invalid expressions are rejected immediately.
+
+```js
+// Pause and resume schedules without removing them
+const success = await minion.pauseSchedule('daily_cleanup');
+const success = await minion.resumeSchedule('daily_cleanup');
+
+// Remove a schedule
+const success = await minion.unschedule('daily_cleanup');
+
+// List schedules
+const {schedules, total} = await minion.listSchedules(0, 10, {names: ['daily_cleanup']});
+for (const {name, cron, last_job, last_run, next_run, paused} of schedules) {
+  console.log(`${name} (${cron}) runs next at ${next_run.toISOString()}`);
+}
+
+// Manually enqueue jobs for all due schedules
+for (const {name, job} of await minion.dispatchSchedules()) {
+  console.log(`Schedule "${name}" enqueued job ${job}.`);
+}
+```
+
+Running workers call `minion.dispatchSchedules()` every `dispatchInterval` milliseconds (defaults to 30 seconds) to
+enqueue any due jobs, coordinated through a PostgreSQL advisory lock so a single dispatch cycle never fires the same
+schedule twice. If no worker has been running, missed runs will not be caught up, the next firing time is always the
+next match after the current time. Schedules are compatible with Perl Minion, so both can share the same database.
+
+### Workers
+
+Workers can be started with `minion.worker()`, and customized with a variety of status options.
+
+```js
+const worker = minion.worker({
+  status: {
+    // Worker remote control command interval, defaults to 10 seconds
+    commandInterval: 10000,
+
+    // Maximum amount of time to wait for jobs, defaults to 5 seconds
+    dequeueTimeout: 5000,
+
+    // Schedule dispatch interval (0 disables dispatching schedules), defaults to 30 seconds
+    dispatchInterval: 30000,
+
+    // Heartbeat interval, defaults to 300 seconds
+    heartbeatInterval: 300000,
+
+    // Maximum number of jobs to perform concurrently (not including spare slots), defaults to 4
+    jobs: 4,
+
+    // Limit the number of concurrent jobs for specific tasks (0 disables the task for this worker)
+    limits: {resizeImage: 2, sendMail: 5},
+
+    // One or more queues to get jobs from, defaults to "default"
+    queues: ['important', 'default'],
+
+    // Repair interval, up to half of this value can be subtracted randomly to make sure not all workers repair at the
+    // same time, defaults to 6 hours
+    repairInterval: 21600000,
+
+    // Number of spare slots to reserve for high priority jobs, defaults to 1
+    spare: 1,
+
+    // Minimum priority of jobs to use spare slots for, defaults to 1
+    spareMinPriority: 1
+  }
+});
+await worker.start();
+
+// Stop gracefully after finishing the current jobs
+await worker.stop();
+```
+
+Task limits allow workers to perform more jobs concurrently without letting a single slow task use up all the slots.
+Jobs for other tasks will continue to be dequeued while a task is at its limit.
+
+Running workers can be controlled with remote control commands, which are broadcast with `minion.broadcast()`. The
+built-in commands are `jobs`, to change how many jobs a worker performs concurrently, and `spare`, to change the number
+of spare slots reserved for high priority jobs. Setting both to `0` pauses a worker, all current jobs will be finished,
+but no new ones accepted, until the numbers are increased again.
+
+```js
+// Reduce concurrency of worker 23 to two jobs
+await minion.broadcast('jobs', [2], [23]);
+
+// Pause all workers
+await minion.broadcast('jobs', [0]);
+await minion.broadcast('spare', [0]);
+
+// Add your own command
+worker.addCommand('my_command', async (worker, ...args) => {
+  ...
+});
+```
+
+### Testing
+
+`minion.performJobs()` can be used to perform all jobs in the queue with a temporary worker, making it very easy to test
+background tasks without having to start a real worker process.
+
+```js
+import Minion from '@minionjs/core';
+import t from 'tap';
+
+const minion = new Minion('postgres://user:password@localhost:5432/test');
+await minion.update();
+
+minion.addTask('add', async (job, a, b) => {
+  await job.finish(a + b);
+});
+
+const id = await minion.enqueue('add', [1, 1]);
+await minion.performJobs();
+t.equal((await (await minion.job(id)).info()).result, 2);
 ```
 
 ### Utilities
@@ -389,12 +657,17 @@ const success = await minion.broadcast('jobs', [0], [23]);
 // Reset job queue
 await minion.reset({
 
-  // Reset everything
+  // Reset everything (including schedules)
   all: true,
 
   // Reset only locks
   locks: true
 });
+
+// Cron expression helpers (times are in UTC)
+import {util} from '@minionjs/core';
+const next = util.nextCronTime('0 9 * * MON-FRI', new Date());
+const parsed = util.parseCron('*/5 * * * *');
 ```
 
 ### mojo.js
@@ -430,16 +703,41 @@ when an application loads `minionPlugin`.
 
 ```
 $ node index.js minion-worker
+$ node index.js minion-worker -j 12 -q important -q default
+$ node index.js minion-worker -L resizeImage=2 -L sendMail=5
 ```
 
 Jobs can be managed right from the command line with the `minion-job` command.
 
 ```
 $ node index.js minion-job
+$ node index.js minion-job 10023
+$ node index.js minion-job -e foo -a '[23, "bar"]'
+
+# Retry job in the foreground and perform it right away (very useful for debugging)
+$ node index.js minion-job -f 10023
+
+# Reduce concurrency of worker 23 to two jobs
+$ node index.js minion-job -b jobs -a '[2]' 23
 ```
 
-You can also add an admin ui to your application by loading `minionAdminPlugin`. Just make sure to secure access before
-making your application publicly accessible.
+And recurring jobs with the `minion-schedule` command.
+
+```
+$ node index.js minion-schedule
+$ node index.js minion-schedule daily_cleanup
+$ node index.js minion-schedule -e daily_cleanup -c '0 4 * * *' -t cleanup
+$ node index.js minion-schedule -e refresh -c '*/5 * * * *' -t refreshCache -a '["users"]' -p 5
+$ node index.js minion-schedule -P daily_cleanup
+$ node index.js minion-schedule -r daily_cleanup
+$ node index.js minion-schedule -R daily_cleanup
+```
+
+Worker processes started with `minion-worker` stop gracefully after finishing their current jobs when they receive an
+`INT` signal.
+
+You can also add an admin ui to your application by loading `minionAdminPlugin`, to manage jobs, locks, schedules and
+workers. Just make sure to secure access before making your application publicly accessible.
 
 ```js
 import {minionPlugin, minionAdminPlugin} from '@minionjs/core';

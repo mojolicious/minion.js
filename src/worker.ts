@@ -1,6 +1,7 @@
 import type Minion from './minion.ts';
 import type {DequeueOptions, MinionCommand, MinionStatus, WorkerInfo, WorkerOptions} from './types.ts';
 import {Job} from './job.ts';
+import {desiredTasks} from './util.ts';
 
 interface JobStatus {
   job: Job;
@@ -23,6 +24,7 @@ export class Worker {
   _active: JobStatus[] = [];
   _id: number | undefined = undefined;
   _lastCommand = 0;
+  _lastDispatch = 0;
   _lastHeartbeat = 0;
   _lastRepair = 0;
   _minion: Minion;
@@ -30,12 +32,14 @@ export class Worker {
   _stop: Array<() => void> = [];
 
   constructor(minion: Minion, options: WorkerOptions = {}) {
-    this.commands = {jobs: jobsCommand, ...options.commands};
-    const status = (this.status = {
+    this.commands = {jobs: jobsCommand, spare: spareCommand, ...options.commands};
+    this.status = {
       commandInterval: 10000,
       dequeueTimeout: 5000,
+      dispatchInterval: 30000,
       heartbeatInterval: 300000,
       jobs: 4,
+      limits: {},
       performed: 0,
       queues: ['default'],
       repairInterval: 21600000,
@@ -43,8 +47,7 @@ export class Worker {
       spareMinPriority: 1,
       type: 'Node.js',
       ...options.status
-    });
-    status.repairInterval -= Math.ceil(Math.random() * (status.repairInterval / 2));
+    };
 
     this._minion = minion;
   }
@@ -107,10 +110,16 @@ export class Worker {
     if (id === undefined) return;
 
     const commands = await this.minion.backend.receive(id);
+    let called = 0;
     for (const [command, ...args] of commands) {
       const fn = this.commands[command];
-      if (fn !== undefined) await fn(this, ...args);
+      if (fn === undefined) continue;
+      await fn(this, ...args);
+      called++;
     }
+
+    // Make status changes visible right away
+    if (called > 0) await this.register();
   }
 
   /**
@@ -127,6 +136,10 @@ export class Worker {
    */
   async start(): Promise<this> {
     if (this.isRunning === true) return this;
+
+    // Randomize to avoid congestion (after status has been customized)
+    const status = this.status;
+    status.repairInterval -= Math.ceil(Math.random() * (status.repairInterval / 2));
 
     this._mainLoop().catch(error => this.minion.app.log.error(error));
     this._running = true;
@@ -174,6 +187,18 @@ export class Worker {
       // Worker is stopped
       if (stop.length > 0) continue;
 
+      // Task limits have been reached (waiting for a job to finish, so the loop does not spin)
+      const tasks = desiredTasks(
+        status.limits,
+        Object.keys(this.minion.tasks),
+        active.map(jobStatus => jobStatus.job.task)
+      );
+      if (tasks.length === 0 && active.length > 0) {
+        await Promise.race(active.map(jobStatus => jobStatus.promise));
+        continue;
+      }
+      options.tasks = tasks;
+
       // Try to get more jobs
       const job = await this.dequeue(status.dequeueTimeout, options);
       if (job === null) continue;
@@ -204,11 +229,20 @@ export class Worker {
       await this.minion.repair();
       this._lastRepair = Date.now();
     }
+
+    // Dispatch schedules in regular intervals (database advisory lock prevents duplicates)
+    if (status.dispatchInterval > 0 && this._lastDispatch + status.dispatchInterval < Date.now()) {
+      await this.minion.dispatchSchedules();
+      this._lastDispatch = Date.now();
+    }
   }
 }
 
 // Remote control commands need to validate arguments carefully
 async function jobsCommand(worker: Worker, num: any) {
-  const jobs = parseInt(num);
-  if (isNaN(jobs) === false) worker.status.jobs = jobs;
+  if (/^\d+$/.test(String(num)) === true) worker.status.jobs = parseInt(num);
+}
+
+async function spareCommand(worker: Worker, num: any) {
+  if (/^\d+$/.test(String(num)) === true) worker.status.spare = parseInt(num);
 }

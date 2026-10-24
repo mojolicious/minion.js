@@ -1,8 +1,10 @@
 import type {
+  DispatchedSchedule,
   EnqueueOptions,
   DequeueOptions,
   JobInfo,
   ListJobsOptions,
+  ListSchedulesOptions,
   ListWorkersOptions,
   LockOptions,
   MinionArgs,
@@ -10,15 +12,19 @@ import type {
   MinionHistory,
   MinionJob,
   MinionJobId,
+  MinionScheduleId,
   MinionStats,
   MinionTask,
   MinionWorker,
   ResetOptions,
+  ScheduleList,
+  ScheduleOptions,
   WorkerInfo,
   WorkerOptions
 } from './types.ts';
 import {Job} from './job.ts';
 import {PgBackend} from './pg-backend.ts';
+import {parseCron} from './util.ts';
 import {Worker} from './worker.ts';
 import mojo, {type MojoApp} from '@mojojs/core';
 import Path from '@mojojs/path';
@@ -26,6 +32,7 @@ import {AbortError, AsyncHooks} from '@mojojs/util';
 
 export {minionPlugin} from './mojo/plugin.ts';
 export {minionAdminPlugin} from './mojo/admin-plugin.ts';
+export * as util from './util.ts';
 
 export const version = JSON.parse(
   Path.currentFile().dirname().sibling('package.json').readFileSync().toString()
@@ -112,11 +119,12 @@ export default class Minion {
   }
 
   /**
-   * Used to calculate the delay for automatically retried jobs, defaults to `(retries ** 4) + 15` (15, 16, 31, 96,
-   * 271, 640...), which means that roughly `25` attempts can be made in `21` days.
+   * Used to calculate the delay in milliseconds for automatically retried jobs, defaults to
+   * `((retries ** 4) + 15) * 1000` (15, 16, 31, 96, 271, 640... seconds), which means that roughly `25` attempts can be
+   * made in `21` days.
    */
   backoff(retries: number): number {
-    return retries ** 4 + 15;
+    return (retries ** 4 + 15) * 1000;
   }
 
   /**
@@ -124,6 +132,15 @@ export default class Minion {
    */
   async broadcast(command: string, args?: any[], ids?: number[]): Promise<boolean> {
     return await this.backend.broadcast(command, args, ids);
+  }
+
+  /**
+   * Enqueue jobs for all schedules whose firing time has been reached, and advance their firing times to the next
+   * match. Multiple workers are coordinated with a PostgreSQL advisory lock, so a schedule never fires twice at the same
+   * time. Workers dispatch schedules automatically in regular intervals.
+   */
+  async dispatchSchedules(): Promise<DispatchedSchedule[]> {
+    return await this.backend.dispatchSchedules();
   }
 
   /**
@@ -210,11 +227,25 @@ export default class Minion {
   }
 
   /**
+   * Return information about schedules in batches.
+   */
+  async listSchedules(offset: number, limit: number, options?: ListSchedulesOptions): Promise<ScheduleList> {
+    return await this.backend.listSchedules(offset, limit, options);
+  }
+
+  /**
    * Try to acquire a named lock that will expire automatically after the given amount of time in milliseconds. You can
    * release the lock manually with `minion.unlock()` to limit concurrency, or let it expire for rate limiting.
    */
   async lock(name: string, duration: number, options?: LockOptions): Promise<boolean> {
     return await this.backend.lock(name, duration, options);
+  }
+
+  /**
+   * Pause a schedule by name, so it stops firing until resumed.
+   */
+  async pauseSchedule(name: string): Promise<boolean> {
+    return await this.backend.pauseSchedule(name);
   }
 
   /**
@@ -257,6 +288,39 @@ export default class Minion {
   }
 
   /**
+   * Resume a previously paused schedule.
+   */
+  async resumeSchedule(name: string): Promise<boolean> {
+    return await this.backend.resumeSchedule(name);
+  }
+
+  /**
+   * Create or update a schedule by unique name. Cron expressions use the standard five field form (minute, hour,
+   * day-of-month, month, day-of-week), with `*`, `*\/N`, `a-b`, `a-b/N` and comma separated lists, the names `JAN`-`DEC`
+   * and `SUN`-`SAT`, and the nicknames `@yearly`, `@monthly`, `@weekly`, `@daily`, `@midnight` and `@hourly`. All times
+   * are interpreted in UTC, not local time. Updating a schedule with the same cron expression preserves its current
+   * firing time, changing the expression recomputes it.
+   * @param options.attempts - Number of times performing each enqueued job will be attempted, defaults to `1`.
+   * @param options.expire - Each enqueued job is valid for this many milliseconds before it expires, stored with a
+   *                         precision of seconds.
+   * @param options.lax - Existing jobs each enqueued job depends on may also have transitioned to the `failed` state,
+   *                      defaults to `false`.
+   * @param options.notes - Object with arbitrary metadata applied to each enqueued job.
+   * @param options.priority - Priority of each enqueued job, defaults to `0`.
+   * @param options.queue - Queue to put each enqueued job in, defaults to `default`.
+   */
+  async schedule(
+    name: string,
+    cron: string,
+    task: string,
+    args?: MinionArgs,
+    options?: ScheduleOptions
+  ): Promise<MinionScheduleId> {
+    parseCron(cron);
+    return await this.backend.schedule(name, cron, task, args, options);
+  }
+
+  /**
    * Get statistics for the job queue.
    */
   async stats(): Promise<MinionStats> {
@@ -268,6 +332,13 @@ export default class Minion {
    */
   async unlock(name: string): Promise<boolean> {
     return await this.backend.unlock(name);
+  }
+
+  /**
+   * Remove a schedule by name.
+   */
+  async unschedule(name: string): Promise<boolean> {
+    return await this.backend.unschedule(name);
   }
 
   /**

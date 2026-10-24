@@ -338,6 +338,128 @@ t.test('Command app', skip, async t => {
 
   await app.models.minion.reset({all: true});
 
+  await t.test('minion-schedule', async t => {
+    await t.test('Empty list', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-schedule');
+      });
+      t.notMatch(output.toString(), /\S/);
+    });
+
+    await t.test('Add schedules', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', '-e', 'daily', '-c', '0 4 * * *', '-t', 'test');
+      });
+      t.match(output.toString(), /^\d+\n$/);
+
+      await captureOutput(async () => {
+        await app.cli.start(
+          'minion-schedule',
+          '-e',
+          'every5',
+          '-c',
+          '*/5 * * * *',
+          '-t',
+          'test',
+          '-a',
+          '[1, 2, 3]',
+          '-A',
+          '3',
+          '-E',
+          '60000',
+          '-n',
+          '{"foo":"bar"}',
+          '-p',
+          '5',
+          '-q',
+          'important',
+          '-x'
+        );
+      });
+      const info = (await minion.listSchedules(0, 1, {names: ['every5']})).schedules[0];
+      t.same(info.args, [1, 2, 3]);
+      t.equal(info.attempts, 3);
+      t.equal(info.expire, 60000);
+      t.same(info.notes, {foo: 'bar'});
+      t.equal(info.priority, 5);
+      t.equal(info.queue, 'important');
+      t.equal(info.lax, true);
+    });
+
+    await t.test('Missing options', async t => {
+      await t.rejects(
+        app.cli.start('minion-schedule', '-e', 'bad', '-t', 'test'),
+        /Cron expression is required \(-c\)/
+      );
+      await t.rejects(app.cli.start('minion-schedule', '-e', 'bad', '-c', '@daily'), /Task is required \(-t\)/);
+      await t.rejects(app.cli.start('minion-schedule', '-e', 'bad', '-c', '61 * * * *', '-t', 'test'), /out of range/);
+      await t.rejects(
+        app.cli.start('minion-schedule', '-e', 'bad', '-c', '@daily', '-t', 'test', '-p', 'x'),
+        /Invalid/
+      );
+    });
+
+    await t.test('List and info', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-schedule');
+      });
+      t.match(output.toString(), /\d+\s+every5\s+test\s+\*\/5 \* \* \* \*\s+\S+Z\s+0\n/);
+      t.match(output.toString(), /\d+\s+daily\s+test\s+0 4 \* \* \*\s+\S+T04:00:00\.000Z\s+0\n/);
+
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', '-l', '1');
+      });
+      t.match(output2.toString(), /every5/);
+      t.notMatch(output2.toString(), /daily/);
+
+      const output3 = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', '-o', '1');
+      });
+      t.match(output3.toString(), /daily/);
+      t.notMatch(output3.toString(), /every5/);
+
+      const output4 = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', 'daily');
+      });
+      t.match(output4.toString(), /cron: 0 4 \* \* \*/);
+      t.match(output4.toString(), /name: daily/);
+      t.match(output4.toString(), /paused: false/);
+
+      await t.rejects(app.cli.start('minion-schedule', 'missing'), /Schedule does not exist/);
+    });
+
+    await t.test('Pause, resume and remove', async t => {
+      await app.cli.start('minion-schedule', '-P', 'daily');
+      t.equal((await minion.listSchedules(0, 1, {names: ['daily']})).schedules[0].paused, true);
+      await app.cli.start('minion-schedule', '-r', 'daily');
+      t.equal((await minion.listSchedules(0, 1, {names: ['daily']})).schedules[0].paused, false);
+      await t.rejects(app.cli.start('minion-schedule', '-P', 'missing'), /Schedule does not exist/);
+      await t.rejects(app.cli.start('minion-schedule', '-r', 'missing'), /Schedule does not exist/);
+      await t.rejects(app.cli.start('minion-schedule', '-R', 'missing'), /Schedule does not exist/);
+    });
+
+    await t.test('Dispatch', async t => {
+      const output = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', '-d');
+      });
+      t.equal(output.toString(), '[]\n');
+
+      const id = (await minion.listSchedules(0, 1, {names: ['daily']})).schedules[0].id;
+      await pg.query`UPDATE minion_schedules SET next_run = NOW() - INTERVAL '1 minute' WHERE id = ${id}`;
+      const output2 = await captureOutput(async () => {
+        await app.cli.start('minion-schedule', '-d');
+      });
+      t.match(output2.toString(), /name: daily/);
+      t.match(output2.toString(), /job: \d+/);
+    });
+
+    await app.cli.start('minion-schedule', '-R', 'daily');
+    await app.cli.start('minion-schedule', '-R', 'every5');
+    t.equal((await minion.listSchedules(0, 1)).total, 0);
+  });
+
+  await app.models.minion.reset({all: true});
+
   await t.test('minion-worker', async t => {
     await t.test('Signals', async t => {
       const id = await minion.enqueue('test');
@@ -356,9 +478,17 @@ t.test('Command app', skip, async t => {
           '--queue',
           'default',
           '--dequeue-timeout',
-          '3000',
+          '3',
           '--command-interval',
-          '5000',
+          '5',
+          '--dispatch-interval',
+          '0',
+          '--repair-interval',
+          '7200',
+          '-L',
+          'test=1',
+          '--limit',
+          'test2=0',
           '--spare-min-priority',
           '3'
         );
@@ -379,6 +509,9 @@ t.test('Command app', skip, async t => {
       t.equal(status.dequeueTimeout, 3000);
       t.equal(status.heartbeatInterval, 0);
       t.equal(status.commandInterval, 5000);
+      t.equal(status.dispatchInterval, 0);
+      t.ok(status.repairInterval >= 3600000 && status.repairInterval < 7200000);
+      t.same(status.limits, {test: 1, test2: 0});
       t.equal(status.spareMinPriority, 3);
 
       // Windows has no signals
@@ -400,6 +533,8 @@ t.test('Command app', skip, async t => {
     await t.rejects(app.cli.start('minion-job', '--worker'), /Unknown option '--worker'/);
     await t.rejects(app.cli.start('minion-worker', '-j', ''), /Invalid number ""/);
     await t.rejects(app.cli.start('minion-worker', '--job', '2'), /Unknown option '--job'/);
+    await t.rejects(app.cli.start('minion-worker', '-L', 'test'), /Invalid limit "test"/);
+    await t.rejects(app.cli.start('minion-worker', '-L', 'test=-1'), /Invalid limit "test=-1"/);
   });
 
   // Clean up once we are done

@@ -3,11 +3,13 @@ import type {
   DailyHistory,
   DequeueOptions,
   DequeuedJob,
+  DispatchedSchedule,
   EnqueueOptions,
   JobInfo,
   JobList,
   ListJobsOptions,
   ListLocksOptions,
+  ListSchedulesOptions,
   ListWorkersOptions,
   LockInfo,
   LockOptions,
@@ -15,22 +17,47 @@ import type {
   MinionArgs,
   MinionHistory,
   MinionJobId,
+  MinionScheduleId,
   MinionStats,
   MinionWorkerId,
   RegisterWorkerOptions,
   ResetOptions,
   RetryOptions,
+  ScheduleInfo,
+  ScheduleList,
+  ScheduleOptions,
   WorkerInfo,
   WorkerList
 } from './types.ts';
 import os from 'node:os';
+import {nextCronTime} from './util.ts';
 import Path from '@mojojs/path';
-import Pg, {type PgConfig} from '@mojojs/pg';
+import Pg, {type Database, type PgConfig} from '@mojojs/pg';
+
+interface AdvisoryLockResult {
+  locked: boolean;
+}
 
 interface DequeueResult {
   id: MinionJobId;
   args: MinionArgs;
   retries: number;
+  task: string;
+}
+
+interface DueScheduleResult {
+  args: MinionArgs;
+  attempts: number;
+  cron: string;
+  expire: number | null;
+  id: MinionScheduleId;
+  lax: boolean;
+  name: string;
+  next_run: Date;
+  notes: Record<string, any>;
+  now: Date;
+  priority: number;
+  queue: string;
   task: string;
 }
 
@@ -51,6 +78,10 @@ interface ListLockResult extends LockInfo {
   total: number;
 }
 
+interface ListSchedulesResult extends ScheduleInfo {
+  total: number;
+}
+
 interface ListWorkersResult extends WorkerInfo {
   total: number;
 }
@@ -59,12 +90,20 @@ interface LockResult {
   minion_lock: boolean;
 }
 
+interface NowResult {
+  now: Date;
+}
+
 interface ReceiveResult {
   inbox: Array<[string, ...any[]]>;
 }
 
 interface RegisterWorkerResult {
   id: MinionWorkerId;
+}
+
+interface ScheduleResult {
+  id: MinionScheduleId;
 }
 
 interface ServerVersionResult {
@@ -139,6 +178,57 @@ export class PgBackend {
   }
 
   /**
+   * Enqueue jobs for all schedules whose firing time has been reached, and advance their firing times to the next
+   * match. A PostgreSQL advisory lock is held for the duration of the dispatch cycle, so that multiple workers
+   * dispatching at the same time will not enqueue the same schedule twice.
+   */
+  async dispatchSchedules(): Promise<DispatchedSchedule[]> {
+    const db = await this.pg.db();
+    try {
+      const tx = await db.begin();
+      try {
+        const lock = await db.query<AdvisoryLockResult>`
+          SELECT pg_try_advisory_xact_lock(hashtext('minion.schedules')) AS locked
+        `;
+        if (lock.first.locked === false) return [];
+
+        const due = await db.query<DueScheduleResult>`
+          SELECT id, args, attempts, cron, expire::BIGINT * 1000 AS expire, lax, name, next_run, NOW() AS now, notes, priority,
+            queue, task
+          FROM minion_schedules WHERE next_run <= NOW() AND NOT paused FOR UPDATE
+        `;
+
+        const dispatched = [];
+        for (const schedule of due) {
+          const {attempts, lax, notes, priority, queue} = schedule;
+          const expire = schedule.expire ?? undefined;
+          const job = await this._enqueue(db, schedule.task, schedule.args, {
+            attempts,
+            expire,
+            lax,
+            notes,
+            priority,
+            queue
+          });
+          const basis = schedule.next_run > schedule.now ? schedule.next_run : schedule.now;
+          const next = nextCronTime(schedule.cron, basis);
+          await db.query`
+            UPDATE minion_schedules SET last_job = ${job}, last_run = NOW(), next_run = ${next} WHERE id = ${schedule.id}
+          `;
+          dispatched.push({id: schedule.id, name: schedule.name, job});
+        }
+        await tx.commit();
+
+        return dispatched;
+      } finally {
+        await tx.rollback();
+      }
+    } finally {
+      await db.release();
+    }
+  }
+
+  /**
    * Stop using the queue.
    */
   async end(): Promise<void> {
@@ -149,28 +239,7 @@ export class PgBackend {
    * Enqueue a new job with `inactive` state.
    */
   async enqueue(task: string, args: MinionArgs = [], options: EnqueueOptions = {}): Promise<MinionJobId> {
-    const results = await this.pg.rawQuery<EnqueueResult>(
-      `
-        INSERT INTO minion_jobs (args, attempts, delayed, expires, lax, notes, parents, priority, queue, task)
-        VALUES ($1, $2, (NOW() + (INTERVAL '1 millisecond' * $3)),
-          CASE WHEN $4::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 millisecond' * $4::BIGINT) END,
-          $5, $6, $7, $8, $9, $10
-        )
-        RETURNING id
-      `,
-      JSON.stringify(args),
-      options.attempts ?? 1,
-      options.delay ?? 0,
-      options.expire,
-      options.lax ?? false,
-      options.notes ?? {},
-      options.parents ?? [],
-      options.priority ?? 0,
-      options.queue ?? 'default',
-      task
-    );
-
-    return results.first.id;
+    return await this._enqueue(this.pg, task, args, options);
   }
 
   /**
@@ -246,7 +315,7 @@ export class PgBackend {
   async listLocks(offset: number, limit: number, options: ListLocksOptions = {}): Promise<LockList> {
     const results = await this.pg.rawQuery<ListLockResult>(
       `
-        SELECT name, expires, COUNT(*) OVER() AS total FROM minion_locks
+        SELECT id, name, expires, COUNT(*) OVER() AS total FROM minion_locks
         WHERE expires > NOW() AND (name = ANY ($1) OR $1 IS NULL)
         ORDER BY id DESC LIMIT $2 OFFSET $3
       `,
@@ -256,6 +325,28 @@ export class PgBackend {
     );
 
     return {total: removeTotal(results), locks: results};
+  }
+
+  /**
+   * Returns information about schedules in batches.
+   */
+  async listSchedules(offset: number, limit: number, options: ListSchedulesOptions = {}): Promise<ScheduleList> {
+    const results = await this.pg.rawQuery<ListSchedulesResult>(
+      `
+        SELECT id, args, attempts, created, cron, expire::BIGINT * 1000 AS expire, last_job, last_run, lax, name, next_run,
+          notes, paused, priority, queue, task, COUNT(*) OVER() AS total
+        FROM minion_schedules
+        WHERE (id < $1 OR $1 IS NULL) AND (id = ANY ($2) OR $2 IS NULL) AND (name = ANY ($3) OR $3 IS NULL)
+        ORDER BY id DESC LIMIT $4 OFFSET $5
+      `,
+      options.before,
+      options.ids,
+      options.names,
+      limit,
+      offset
+    );
+
+    return {total: removeTotal(results), schedules: results};
   }
 
   /**
@@ -297,6 +388,13 @@ export class PgBackend {
     const results = await this.pg
       .query`UPDATE minion_jobs SET notes = JSONB_STRIP_NULLS(notes || ${merge}) WHERE id = ${id}`;
     return (results.count ?? 0) > 0;
+  }
+
+  /**
+   * Pause a schedule by name, so it stops firing until resumed.
+   */
+  async pauseSchedule(name: string): Promise<boolean> {
+    return await this._setPaused(name, true);
   }
 
   /**
@@ -352,7 +450,7 @@ export class PgBackend {
       DELETE FROM minion_jobs
       WHERE id IN (
         SELECT id FROM minion_jobs
-        WHERE state = 'finished' AND finished <= NOW() - INTERVAL '1 second' * ${minion.removeAfter}
+        WHERE state = 'finished' AND finished <= NOW() - INTERVAL '1 millisecond' * ${minion.removeAfter}
         EXCEPT SELECT unnest(parents) AS id FROM minion_jobs WHERE state != 'finished'
       )
     `;
@@ -381,8 +479,17 @@ export class PgBackend {
    * Reset job queue.
    */
   async reset(options: ResetOptions): Promise<void> {
-    if (options.all === true) await this.pg.query`TRUNCATE minion_jobs, minion_locks, minion_workers RESTART IDENTITY`;
+    if (options.all === true) {
+      await this.pg.query`TRUNCATE minion_jobs, minion_locks, minion_schedules, minion_workers RESTART IDENTITY`;
+    }
     if (options.locks === true) await this.pg.query`TRUNCATE minion_locks`;
+  }
+
+  /**
+   * Resume a previously paused schedule.
+   */
+  async resumeSchedule(name: string): Promise<boolean> {
+    return await this._setPaused(name, false);
   }
 
   /**
@@ -417,6 +524,51 @@ export class PgBackend {
   }
 
   /**
+   * Create or update a schedule by unique name. Updating a schedule with the same cron expression preserves its
+   * current firing time, changing the expression recomputes it.
+   */
+  async schedule(
+    name: string,
+    cron: string,
+    task: string,
+    args: MinionArgs = [],
+    options: ScheduleOptions = {}
+  ): Promise<MinionScheduleId> {
+    const now = (await this.pg.query<NowResult>`SELECT NOW() AS now`).first.now;
+    const next = nextCronTime(cron, now);
+
+    // Stored in seconds to stay compatible with Perl Minion
+    const expire = options.expire === undefined ? null : Math.ceil(options.expire / 1000);
+
+    const results = await this.pg.rawQuery<ScheduleResult>(
+      `
+        INSERT INTO minion_schedules (args, attempts, cron, expire, lax, name, next_run, notes, priority, queue, task)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (name) DO UPDATE SET
+          args = EXCLUDED.args, attempts = EXCLUDED.attempts, cron = EXCLUDED.cron, expire = EXCLUDED.expire,
+          lax = EXCLUDED.lax, notes = EXCLUDED.notes, priority = EXCLUDED.priority, queue = EXCLUDED.queue,
+          task = EXCLUDED.task,
+          next_run =
+            CASE WHEN minion_schedules.cron = EXCLUDED.cron THEN minion_schedules.next_run ELSE EXCLUDED.next_run END
+        RETURNING id
+      `,
+      JSON.stringify(args),
+      options.attempts ?? 1,
+      cron,
+      expire,
+      options.lax ?? false,
+      name,
+      next,
+      options.notes ?? {},
+      options.priority ?? 0,
+      options.queue ?? 'default',
+      task
+    );
+
+    return results.first.id;
+  }
+
+  /**
    * Get statistics for the job queue.
    */
   async stats(): Promise<MinionStats> {
@@ -429,6 +581,8 @@ export class PgBackend {
         (SELECT COUNT(*) FROM minion_jobs WHERE state = 'finished') AS finished_jobs,
         (SELECT COUNT(*) FROM minion_jobs WHERE state = 'inactive' AND delayed > NOW()) AS delayed_jobs,
         (SELECT COUNT(*) FROM minion_locks WHERE expires > NOW()) AS active_locks,
+        (SELECT COUNT(*) FROM minion_schedules WHERE NOT paused) AS schedules,
+        (SELECT COUNT(*) FROM minion_schedules WHERE paused) AS inactive_schedules,
         (SELECT COUNT(DISTINCT worker) FROM minion_jobs mj WHERE state = 'active') AS active_workers,
         (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM minion_jobs_id_seq) AS enqueued_jobs,
         (SELECT COUNT(*) FROM minion_workers) AS workers,
@@ -460,13 +614,21 @@ export class PgBackend {
   }
 
   /**
+   * Remove a schedule by name.
+   */
+  async unschedule(name: string): Promise<boolean> {
+    const results = await this.pg.query`DELETE FROM minion_schedules WHERE name = ${name}`;
+    return (results.count ?? 0) > 0;
+  }
+
+  /**
    * Update database schema to latest version.
    */
   async update(): Promise<void> {
     const pg = this.pg;
 
     const version = (await pg.query<ServerVersionResult>`SHOW server_version_num`).first.server_version_num;
-    if (version < 90500) throw new Error('PostgreSQL 9.5 or later is required');
+    if (version < 130000) throw new Error('PostgreSQL 13 or later is required');
 
     const migrations = pg.migrations;
     await migrations.fromFile(Path.currentFile().dirname().sibling('migrations', 'minion.sql'), {name: 'minion'});
@@ -479,26 +641,65 @@ export class PgBackend {
     return this.retryJob(id, retries, {attempts: attempts > 1 ? attempts - 1 : 1, delay});
   }
 
+  async _enqueue(
+    db: Pg | Database,
+    task: string,
+    args: MinionArgs = [],
+    options: EnqueueOptions = {}
+  ): Promise<MinionJobId> {
+    const results = await db.rawQuery<EnqueueResult>(
+      `
+        INSERT INTO minion_jobs (args, attempts, delayed, expires, lax, notes, parents, priority, queue, task)
+        VALUES ($1, $2, (NOW() + (INTERVAL '1 millisecond' * $3)),
+          CASE WHEN $4::BIGINT IS NOT NULL THEN NOW() + (INTERVAL '1 millisecond' * $4::BIGINT) END,
+          $5, $6, $7, $8, $9, $10
+        )
+        RETURNING id
+      `,
+      JSON.stringify(args),
+      options.attempts ?? 1,
+      options.delay ?? 0,
+      options.expire,
+      options.lax ?? false,
+      options.notes ?? {},
+      options.parents ?? [],
+      options.priority ?? 0,
+      options.queue ?? 'default',
+      task
+    );
+
+    return results.first.id;
+  }
+
+  async _setPaused(name: string, paused: boolean): Promise<boolean> {
+    const results = await this.pg.query`UPDATE minion_schedules SET paused = ${paused} WHERE name = ${name}`;
+    return (results.count ?? 0) > 0;
+  }
+
   async _try(id: MinionWorkerId, options: DequeueOptions): Promise<DequeuedJob | null> {
     const jobId = options.id;
     const minPriority = options.minPriority;
     const queues = options.queues ?? ['default'];
-    const tasks = Object.keys(this.minion.tasks);
+    const tasks = options.tasks ?? Object.keys(this.minion.tasks);
 
     const results = await this.pg.query<DequeueResult>`
-      UPDATE minion_jobs SET started = NOW(), state = 'active', worker = ${id}
-      WHERE id = (
+      WITH cte AS (
         SELECT id FROM minion_jobs AS j
         WHERE delayed <= NOW() AND id = COALESCE(${jobId}, id) AND (parents = '{}' OR NOT EXISTS (
-          SELECT 1 FROM minion_jobs WHERE id = ANY (j.parents) AND (
+          SELECT 1 FROM minion_jobs
+          WHERE id = ANY (j.parents) AND (
             state = 'active' OR (state = 'failed' AND NOT j.lax)
-            OR (state = 'inactive' AND (expires IS NULL OR expires > NOW())))
+            OR (state = 'inactive' AND (expires IS NULL OR expires > NOW()))
+          )
         )) AND priority >= COALESCE(${minPriority}, priority) AND queue = ANY (${queues}) AND state = 'inactive'
-          AND task = ANY (${tasks}) AND (EXPIRES IS NULL OR expires > NOW())
+          AND task = ANY (${tasks}) AND (expires IS NULL OR expires > NOW())
         ORDER BY priority DESC, id
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
+      UPDATE minion_jobs
+      SET started = NOW(), state = 'active', worker = ${id}
+      WHERE id = (SELECT id FROM cte)
       RETURNING id, args, retries, task
     `;
 

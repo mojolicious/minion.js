@@ -1,0 +1,110 @@
+% view.layout = 'minion';
+% stash.title = 'Minion - Schedules';
+
+%= await ctx.include('minion/_notifications')
+
+<form action="<%= ctx.urlFor('minion_manage_schedules', {query: {_method: 'PATCH'}}) %>" method="POST">
+  <div class="d-flex justify-content-between">
+    <div>
+      <div class="btn-group" role="group">
+        <button class="btn btn-outline-secondary" name="do" value="pause" type="submit">
+          <i class="fas fa-pause" aria-hidden="true"></i> Pause
+        </button>
+        <button class="btn btn-outline-secondary" name="do" value="resume" type="submit">
+          <i class="fas fa-play" aria-hidden="true"></i> Resume
+        </button>
+        <button class="btn btn-outline-secondary" name="do" value="remove" type="submit">
+          <i class="fas fa-times" aria-hidden="true"></i> Remove
+        </button>
+      </div>
+    </div>
+    <p class="align-middle">
+      % if (schedules.length > 0) {
+        <%= offset + 1 %>-<%= offset + schedules.length %> of <%= total %>
+      % }
+    </p>
+    %= await ctx.include('minion/_limit')
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><input class="checkall" data-check="name" type="checkbox"></th>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Task</th>
+            <th>Cron</th>
+            <th>Queue</th>
+            <th>Last run</th>
+            <th>Next run</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        % if (schedules.length > 0) {
+          % let num = 0;
+          % for (const schedule of schedules) {
+            % num++;
+            <tbody>
+              <tr>
+                <td>
+                  <input type="checkbox" name="name" value="<%= schedule.name %>">
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {name: schedule.name}}) %>">
+                    <%= schedule.id %>
+                  </a>
+                </td>
+                <td>
+                  <a href="<%= ctx.urlFor('current', {query: {offset: 0, name: schedule.name}}) %>">
+                    <%= schedule.name %>
+                  </a>
+                </td>
+                <td><%= schedule.task %></td>
+                <td><code><%= schedule.cron %></code></td>
+                <td>
+                  <a href="<%= ctx.urlFor('minion_jobs', {query: {queue: schedule.queue}}) %>">
+                    <%= schedule.queue %>
+                  </a>
+                </td>
+                <td>
+                  % if (schedule.last_job !== null && schedule.last_run !== null) {
+                    <a class="from-now" href="<%= ctx.urlFor('minion_jobs', {query: {id: String(schedule.last_job)}}) %>"><%= schedule.last_run.getTime() / 1000 %></a>
+                  % } else {
+                    <span class="text-muted">never</span>
+                  % }
+                </td>
+                <td class="from-now"><%= schedule.next_run.getTime() / 1000 %></td>
+                <td class="accordion-toggle collapsed" data-toggle="collapse" data-target="#schedule<%= num %>">
+                  % if (schedule.paused === true) {
+                    <span class="badge badge-warning">paused</span>
+                  % } else {
+                    <span class="badge badge-success">active</span>
+                  % }
+                </td>
+                <td class="accordion-toggle collapsed expand" data-toggle="collapse" data-target="#schedule<%= num %>">
+                  <span class="fas fa-lg expand-icon"></span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="10" class="hiddenRow">
+                  <div class="collapse" id="schedule<%= num %>">
+                    <pre class="border rounded"><%= ctx.yamlDump(schedule) %></pre>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          % }
+        % } else {
+          <tr><td colspan="10"><p class="text-center"><i class="fas fa-info-circle"></i> No schedules found</p></td></tr>
+        % }
+      </table>
+    </div>
+  </div>
+</form>
+
+<div class="d-flex justify-content-center">
+  %= await ctx.include('minion/_pagination')
+</div>

@@ -1,4 +1,10 @@
-import type {ListJobsOptions, ListLocksOptions, ListWorkersOptions, MinionStates} from '../types.ts';
+import type {
+  ListJobsOptions,
+  ListLocksOptions,
+  ListSchedulesOptions,
+  ListWorkersOptions,
+  MinionStates
+} from '../types.ts';
 import type {MojoApp, MojoContext, MojoRoute} from '@mojojs/core';
 import {version} from '../minion.ts';
 import Path from '@mojojs/path';
@@ -26,6 +32,8 @@ export function minionAdminPlugin(app: MojoApp, options: {returnTo?: string; rou
   prefix.patch('/jobs', manageJobs).name('minion_manage_jobs');
   prefix.get('/locks', listLocks).name('minion_locks');
   prefix.delete('/locks', unlock).name('minion_unlock');
+  prefix.get('/schedules', listSchedules).name('minion_schedules');
+  prefix.patch('/schedules', manageSchedules).name('minion_manage_schedules');
   prefix.get('/workers', listWorkers).name('minion_workers');
 }
 
@@ -97,6 +105,30 @@ async function listLocks(ctx: MojoContext): Promise<any> {
   await ctx.render({view: 'minion/locks'}, {locks: results.locks, total: results.total, limit, offset});
 }
 
+async function listSchedules(ctx: MojoContext): Promise<any> {
+  const validate = ctx.schema({
+    type: 'object',
+    properties: {
+      limit: {type: 'number'},
+      offset: {type: 'number'},
+      name: {type: 'string'}
+    }
+  });
+
+  const params = await ctx.params({notEmpty: true});
+  const result = validate(params.toObject());
+  if (result.isValid === false) return await ctx.render({text: 'Validation failed', status: 400});
+
+  const limit = parseInt(params.get('limit') ?? '10');
+  const offset = parseInt(params.get('offset') ?? '0');
+
+  const options: ListSchedulesOptions = {};
+  if (params.has('name')) options.names = params.getAll('name');
+
+  const results = await ctx.models.minion.backend.listSchedules(offset, limit, options);
+  await ctx.render({view: 'minion/schedules'}, {schedules: results.schedules, total: results.total, limit, offset});
+}
+
 async function listWorkers(ctx: MojoContext): Promise<any> {
   const validate = ctx.schema({
     type: 'object',
@@ -165,6 +197,7 @@ async function manageJobs(ctx: MojoContext): Promise<any> {
       flash.danger = "Couldn't remove all jobs.";
     } else {
       flash.success = 'All selected jobs removed.';
+      ctx.log.debug(`Jobs removed by user "${ctx.req.remoteAddress}": ${ids.join(', ')}`);
     }
   }
 
@@ -189,6 +222,67 @@ async function manageJobs(ctx: MojoContext): Promise<any> {
   }
 
   await ctx.redirectTo('minion_jobs', {query: {id: ids.map(String)}});
+}
+
+async function manageSchedules(ctx: MojoContext): Promise<any> {
+  const validate = ctx.schema({
+    type: 'object',
+    properties: {
+      do: {type: 'string', enum: ['pause', 'resume', 'remove']},
+      name: {type: 'string'}
+    },
+    required: ['do', 'name']
+  });
+
+  const params = await ctx.params({notEmpty: true});
+  const result = validate(params.toObject());
+  if (result.isValid === false) return await ctx.render({text: 'Validation failed', status: 400});
+
+  const minion = ctx.models.minion;
+  const names = params.getAll('name');
+  const action = params.get('do');
+  const flash = await ctx.flash();
+
+  // Pause
+  if (action === 'pause') {
+    let fail = 0;
+    for (const name of names) {
+      if ((await minion.pauseSchedule(name)) === false) fail++;
+    }
+    if (fail > 0) {
+      flash.danger = "Couldn't pause all schedules.";
+    } else {
+      flash.success = 'All selected schedules paused.';
+    }
+  }
+
+  // Resume
+  else if (action === 'resume') {
+    let fail = 0;
+    for (const name of names) {
+      if ((await minion.resumeSchedule(name)) === false) fail++;
+    }
+    if (fail > 0) {
+      flash.danger = "Couldn't resume all schedules.";
+    } else {
+      flash.success = 'All selected schedules resumed.';
+    }
+  }
+
+  // Remove
+  else if (action === 'remove') {
+    let fail = 0;
+    for (const name of names) {
+      if ((await minion.unschedule(name)) === false) fail++;
+    }
+    if (fail > 0) {
+      flash.danger = "Couldn't remove all schedules.";
+    } else {
+      flash.success = 'All selected schedules removed.';
+    }
+  }
+
+  await ctx.redirectTo('minion_schedules', {query: {name: names}});
 }
 
 async function stats(ctx: MojoContext): Promise<void> {
